@@ -1,0 +1,153 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 5 * * 1"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r extensions/itx-gates/requirements.txt
+          pip install -r requirements-dev.txt
+          pip install pip-licenses
+
+      - name: Secret scan (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Lint Python (ruff)
+        run: |
+          ruff check scripts extensions/itx-gates/hooks tests
+
+      - name: Type check Python (mypy)
+        run: |
+          mypy scripts extensions/itx-gates/hooks tests
+
+      - name: Dependency audit (pip-audit)
+        run: |
+          pip-audit -r extensions/itx-gates/requirements.txt
+          pip-audit -r requirements-dev.txt
+
+      - name: License policy check (pip-licenses)
+        run: |
+          pip-licenses --allow-only "MIT License;BSD License;Apache Software License;ISC License;Python Software Foundation License"
+
+      - name: Python compile checks
+        run: |
+          python -m py_compile \
+            extensions/itx-gates/hooks/orchestrator.py \
+            extensions/itx-gates/hooks/validators/__init__.py \
+            extensions/itx-gates/hooks/validators/trading_ast.py \
+            extensions/itx-gates/hooks/validators/banking_heuristic.py \
+            extensions/itx-gates/hooks/validators/health_regex.py \
+            scripts/validate_catalog.py \
+            scripts/build_catalog_artifacts.py \
+            scripts/build_pattern_index.py \
+            scripts/build_knowledge_manifest.py \
+            scripts/itx_init.py \
+            scripts/release.py \
+            scripts/patch.py \
+            extensions/itx-gates/commands/run_speckit.py \
+            tests/test_orchestrator.py \
+            tests/test_release.py \
+            tests/test_validate_catalog.py \
+            tests/test_itx_init.py \
+            tests/test_patch.py
+
+      - name: Run unit tests
+        run: |
+          python -m unittest discover -s tests -p "test_*.py"
+
+      - name: Validate catalog/manifests
+        run: |
+          python scripts/validate_catalog.py
+
+      - name: Verify pattern-index files are up to date
+        run: |
+          python scripts/build_pattern_index.py
+          if ! git diff --exit-code -- 'presets/*/pattern-index.md'; then
+            echo "::error::pattern-index.md files are out of date. Run 'make build-pattern-index' and commit."
+            exit 1
+          fi
+
+      - name: Release script smoke test
+        run: |
+          python scripts/release.py --version 0.1.0
+
+  upstream-drift-detection:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone latest spec-kit main
+        run: |
+          git clone --depth 1 --branch main https://github.com/github/spec-kit.git /tmp/spec-kit-main
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install latest specify-cli from upstream
+        run: |
+          python -m pip install --upgrade pip
+          pip install "specify-cli @ git+https://github.com/github/spec-kit.git@main"
+          pip install -r extensions/itx-gates/requirements.txt
+
+      - name: Drift checks (CLI flags, layout, bootstrap)
+        run: |
+          set -euo pipefail
+          REPORT=/tmp/itx-drift-report.txt
+          : > "${REPORT}"
+
+          echo "[drift] checking cloned upstream repo" | tee -a "${REPORT}"
+          test -d /tmp/spec-kit-main
+
+          echo "[drift] checking specify init flags" | tee -a "${REPORT}"
+          specify init --help | tee /tmp/specify-init-help.txt >/dev/null
+          grep -q -- "--here" /tmp/specify-init-help.txt
+          grep -q -- "--ai" /tmp/specify-init-help.txt
+          grep -q -- "--script" /tmp/specify-init-help.txt
+
+          echo "[drift] checking specify generated layout" | tee -a "${REPORT}"
+          TMP_SPEC_DIR="$(mktemp -d)"
+          (cd "${TMP_SPEC_DIR}" && specify init --here --ai codex --script sh --force)
+          test -d "${TMP_SPEC_DIR}/.specify"
+
+          echo "[drift] checking itx-init bootstrap" | tee -a "${REPORT}"
+          TMP_WORKSPACE="$(mktemp -d)"
+          ./init-scripts/itx-init.sh \
+            --project-name "drift-smoke" \
+            --agent codex \
+            --domain base \
+            --workspace "${TMP_WORKSPACE}" \
+            --execution-mode mcp \
+            --quiet
+          test -d "${TMP_WORKSPACE}/.specify/patterns"
+          test -d "${TMP_WORKSPACE}/.specify/design-patterns"
+          test -d "${TMP_WORKSPACE}/.specify/anti-patterns"
+          test -f "${TMP_WORKSPACE}/.itx-config.yml"
+          test -f "${TMP_WORKSPACE}/.specify/policy.yml"
+          test -f "${TMP_WORKSPACE}/.specify/knowledge-manifest.json"
+          echo "[drift] drift checks passed" | tee -a "${REPORT}"
+
+      - name: Upload drift report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: upstream-drift-report
+          path: /tmp/itx-drift-report.txt

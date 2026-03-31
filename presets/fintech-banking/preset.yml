@@ -1,0 +1,53 @@
+schema_version: "1.0"
+
+preset:
+  id: "fintech-banking"
+  name: "Itexus Fintech Banking Preset"
+  version: 0.1.3
+  description: "Banking domain overlay for Itexus spec-driven delivery"
+  author: "itexus"
+  repository: "https://github.com/sprivalov/itexus-spec-kit"
+  license: "MIT"
+
+requires:
+  speckit_version: ">=0.1.0"
+
+provides:
+  patterns:
+    - type: "pattern"
+      name: "event-sourced-ledger"
+      file: "patterns/event-sourced-ledger.md"
+      description: "Append-only ledger with event-sourced account state"
+    - type: "pattern"
+      name: "saga-distributed-transactions"
+      file: "patterns/saga-distributed-transactions.md"
+      description: "Saga orchestration for cross-service transaction flow"
+    - type: "pattern"
+      name: "psd2-api-gateway"
+      file: "patterns/psd2-api-gateway.md"
+      description: "PSD2-compliant API gateway for open banking integration"
+
+  design_patterns:
+    - type: "design-pattern"
+      name: "command-pattern-ledger"
+      file: "design-patterns/command-pattern-ledger.md"
+      description: "Command pattern for encapsulating ledger mutations"
+    - type: "design-pattern"
+      name: "fowler-money-pattern"
+      file: "design-patterns/fowler-money-pattern.md"
+      description: "Safe currency arithmetic using integer minor units"
+
+  anti_patterns:
+    - type: "anti-pattern"
+      name: "in-place-balance-updates"
+      file: "anti-patterns/in-place-balance-updates.md"
+      description: "Forbids direct balance mutation; requires transaction appends"
+    - type: "anti-pattern"
+      name: "implicit-time-coupling"
+      file: "anti-patterns/implicit-time-coupling.md"
+      description: "Forbids DateTime.Now in domain logic; requires Clock injection"
+
+tags:
+  - "itexus"
+  - "fintech-banking"
+  - "preset"

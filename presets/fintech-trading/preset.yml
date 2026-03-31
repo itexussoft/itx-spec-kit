@@ -1,0 +1,41 @@
+schema_version: "1.0"
+
+preset:
+  id: "fintech-trading"
+  name: "Itexus Fintech Trading Preset"
+  version: 0.1.3
+  description: "Trading domain overlay for Itexus spec-driven delivery"
+  author: "itexus"
+  repository: "https://github.com/sprivalov/itexus-spec-kit"
+  license: "MIT"
+
+requires:
+  speckit_version: ">=0.1.0"
+
+provides:
+  patterns:
+    - type: "pattern"
+      name: "cqrs-order-sequencing"
+      file: "patterns/cqrs-order-sequencing.md"
+      description: "CQRS and deterministic sequencing for order flow"
+    - type: "pattern"
+      name: "high-availability-cell-based"
+      file: "patterns/high-availability-cell-based.md"
+      description: "Cell-based architecture for high-availability trading systems"
+
+  design_patterns:
+    - type: "design-pattern"
+      name: "state-pattern-order-lifecycle"
+      file: "design-patterns/state-pattern-order-lifecycle.md"
+      description: "State transitions for trading order lifecycle"
+
+  anti_patterns:
+    - type: "anti-pattern"
+      name: "blocking-io-hot-paths"
+      file: "anti-patterns/blocking-io-hot-paths.md"
+      description: "Avoiding blocking I/O on latency-critical order paths"
+
+tags:
+  - "itexus"
+  - "fintech-trading"
+  - "preset"

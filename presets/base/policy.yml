@@ -1,0 +1,90 @@
+# Shared policy manifest — single source of truth for plan tier rules.
+# Consumed by orchestrator.py at runtime. Referenced by templates and constitution.
+
+plan_tiers:
+  system:
+    match_filename: "system-design-plan"
+    mandatory_sections:
+      - "## 4. Architectural Patterns Applied"
+      - "## 4b. Code-Level Design Patterns Applied"
+      - "## 5. DDD Aggregates"
+      - "## 13. Test Strategy"
+    pattern_selection: required
+
+  patch:
+    match_filename: "patch-plan"
+    mandatory_sections:
+      - "## 1. Problem Statement"
+      - "## 2. Files / Modules Affected"
+    pattern_selection: optional
+
+placeholder_markers:
+  - "_e.g.,"
+  - "e.g.,"
+  - "MANDATORY"
+
+gate:
+  default_max_tier1_retries: 3
+  heuristic_retry_escalates: false
+
+rules:
+  e2e-test-presence:
+    severity: tier1
+    confidence: deterministic
+    remediation_owner: feature-team
+  e2e-test-empty:
+    severity: tier1
+    confidence: deterministic
+    remediation_owner: feature-team
+  e2e-test-placeholder:
+    severity: tier1
+    confidence: heuristic
+    remediation_owner: feature-team
+  e2e-test-family-empty:
+    severity: tier1
+    confidence: deterministic
+    remediation_owner: feature-team
+  trading-no-float-money:
+    severity: tier2
+    confidence: deterministic
+    remediation_owner: domain-team
+  trading-idempotency-key-missing:
+    severity: tier2
+    confidence: deterministic
+    remediation_owner: domain-team
+  trading-order-lifecycle-illegal-transition:
+    severity: tier2
+    confidence: deterministic
+    remediation_owner: domain-team
+  trading-hotpath-blocking-io:
+    severity: tier2
+    confidence: deterministic
+    remediation_owner: domain-team
+  trading-replay-protection-missing:
+    severity: tier1
+    confidence: heuristic
+    remediation_owner: domain-team
+  banking-pci-pan-storage:
+    severity: tier1
+    confidence: heuristic
+    remediation_owner: security-team
+  banking-ledger-inplace-mutation:
+    severity: tier2
+    confidence: deterministic
+    remediation_owner: domain-team
+  banking-idempotency-key-missing:
+    severity: tier2
+    confidence: deterministic
+    remediation_owner: domain-team
+  banking-payment-boundary-controls-missing:
+    severity: tier1
+    confidence: heuristic
+    remediation_owner: security-team
+  banking-psd2-sca-missing-advisory:
+    severity: tier1
+    confidence: heuristic
+    remediation_owner: domain-team
+  healthcare-phi-logging:
+    severity: tier1
+    confidence: heuristic
+    remediation_owner: security-team

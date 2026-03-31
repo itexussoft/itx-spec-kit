@@ -1,0 +1,63 @@
+schema_version: "1.0"
+
+extension:
+  id: "itx-gates"
+  name: "itexus-spec-kit itx-gates"
+  version: 0.1.3
+  description: "Quality gate orchestrator that runs Itexus tiered validators"
+  author: "itexus"
+  repository: "https://github.com/sprivalov/itexus-spec-kit"
+  license: "MIT"
+  homepage: "https://github.com/sprivalov/itexus-spec-kit"
+
+requires:
+  speckit_version: ">=0.1.0"
+
+provides:
+  commands:
+    - name: "speckit.itx-gates.after-plan"
+      file: "commands/after_plan.md"
+      description: "Run itx-gates after plan generation"
+
+    - name: "speckit.itx-gates.after-tasks"
+      file: "commands/after_tasks.md"
+      description: "Run itx-gates after task generation"
+
+    - name: "speckit.itx-gates.after-implement"
+      file: "commands/after_implement.md"
+      description: "Run itx-gates after implementation"
+
+    - name: "speckit.itx-gates.review-run"
+      file: "commands/review_run.md"
+      description: "Run spec-kit-review via the universal runner adapter"
+
+    - name: "speckit.itx-gates.cleanup-run"
+      file: "commands/cleanup_run.md"
+      description: "Run spec-kit-cleanup via the universal runner adapter"
+
+hooks:
+  after_plan:
+    command: "speckit.itx-gates.after-plan"
+    optional: false
+    prompt: ""
+    description: "Itexus quality gates after plan generation — validates system design plan"
+    condition: null
+
+  after_tasks:
+    command: "speckit.itx-gates.after-tasks"
+    optional: false
+    prompt: ""
+    description: "Itexus quality gates after tasks generation"
+    condition: null
+
+  after_implement:
+    command: "speckit.itx-gates.after-implement"
+    optional: false
+    prompt: ""
+    description: "Itexus quality gates after implementation"
+    condition: null
+
+tags:
+  - "itexus"
+  - "gates"
+  - "quality"

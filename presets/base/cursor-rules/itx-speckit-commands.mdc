@@ -1,0 +1,69 @@
+---
+description: How to execute extension slash commands /speckit.review.run and /speckit.cleanup.run
+globs:
+alwaysApply: true
+---
+
+# Spec-Kit Command Execution Rules
+
+## When the user runs `/speckit.review.run` or `/speckit.cleanup.run`
+
+These commands MUST be executed via the universal runner adapter, NOT by
+improvising fallback checks or trying to invoke the Spec-Kit CLI directly.
+
+### Invocation
+
+```bash
+# Review
+python .specify/extensions/itx-gates/commands/run_speckit.py \
+  --command review.run --workspace .
+
+# Cleanup
+python .specify/extensions/itx-gates/commands/run_speckit.py \
+  --command cleanup.run --workspace .
+```
+
+### Handling the output
+
+The adapter tries CLI dispatch first. If no CLI is available or the CLI
+cannot handle the command, the adapter falls back to **local resolution**:
+it reads the extension registry in `.specify/extensions/.registry`, locates
+the command's markdown prompt, and prints it to stdout wrapped in markers.
+
+**Check stdout for the prompt envelope:**
+
+- If the output contains `---SPECKIT-PROMPT---` … `---END-SPECKIT-PROMPT---`,
+  the text between those markers is the extension's agent instructions.
+  **Read and execute those instructions as your current task.** Do NOT
+  simply echo them back to the user.
+- If the output does NOT contain the prompt envelope, the CLI handled the
+  command directly. Report the full stdout and stderr to the user verbatim.
+
+### Rules
+
+1. **Always use the runner adapter.** Do not attempt to run `speckit`, `specify`, or `uvx` directly. The adapter handles CLI detection, fallback, and local resolution automatically.
+2. **Never improvise replacement checks.** If the runner adapter fails (exit code ≠ 0), report the error verbatim. Do not substitute your own lint/type/test commands as a "review" replacement.
+3. **Execute locally-resolved prompts.** When the adapter returns a prompt envelope, you MUST follow the instructions inside it — they are the extension's canonical agent prompt.
+4. The runner adapter resolves CLIs in priority order: `spec-kit` → `specify` → `uvx`. If none can dispatch the command, it resolves the extension prompt from the local workspace.
+
+### Other `/speckit.*` commands
+
+Do **not** route core Spec-Kit workflow commands through this adapter.
+Run them directly as slash commands in the agent chat (for example:
+`/speckit.constitution`, `/speckit.specify`, `/speckit.clarify`,
+`/speckit.plan`, `/speckit.tasks`, `/speckit.analyze`,
+`/speckit.implement`).
+
+Why: this adapter is intended for extension command dispatch and local
+extension prompt resolution. Core workflow commands are not registered in
+the local extension registry and can fail with "command not found" when
+forced through the adapter.
+
+### Gate commands (`after_plan`, `after_tasks`, `after_implement`)
+
+Gate hooks have their own dedicated orchestrator and should NOT go through the runner adapter:
+
+```bash
+python .specify/extensions/itx-gates/hooks/orchestrator.py \
+  --event <event> --workspace .
+```

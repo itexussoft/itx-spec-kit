@@ -1,0 +1,33 @@
+{
+  "schema_version": "1.0",
+  "kit": {
+    "name": "itexus-spec-kit",
+    "version": "0.1.3"
+  },
+  "artifacts": {
+    "presets": [
+      {
+        "name": "base",
+        "path": "presets/base"
+      },
+      {
+        "name": "fintech-trading",
+        "path": "presets/fintech-trading"
+      },
+      {
+        "name": "fintech-banking",
+        "path": "presets/fintech-banking"
+      },
+      {
+        "name": "healthcare",
+        "path": "presets/healthcare"
+      }
+    ],
+    "extensions": [
+      {
+        "name": "itx-gates",
+        "path": "extensions/itx-gates"
+      }
+    ]
+  }
+}
