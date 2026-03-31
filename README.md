@@ -2,6 +2,20 @@
 
 Itexus accelerator for spec-driven AI delivery on top of `github/spec-kit`.
 
+**Kit version** is declared in [`catalog/index.json`](catalog/index.json) as `kit.version` (currently **0.2.0**).
+
+## What changed in 0.2.0
+
+- **Governance foundation (agent autonomy):** base preset ships YAML contracts copied into `.specify/` on bootstrap and patch:
+  - `decision-authority.yml` — decision rights (autonomous / propose / human)
+  - `input-contracts.yml` — required and optional inputs and validation rules per workflow phase
+  - `notification-events.yml` — lifecycle, gate, approval, and error notification contract
+  - `workflow-state-schema.yml` — persisted workflow state for resumable runs
+- **Knowledge base:** `delivery-mechanics.md` in the base preset docs (installed under `docs/knowledge-base/`); `index.md` indexes the governance artifacts above.
+- **`after_review` gate:** new Spec-Kit hook runs completion checks after review — all tasks checked off, no outstanding Tier 2 findings in `gate_feedback.md`, E2E assertion baseline still satisfied.
+- **Templates:** `done-report-template.md` for delivery traceability and merge handoff.
+- **Init/patch:** governance YAML uses the same safe-update rules as `constitution.md`, `policy.yml`, and KB docs (`.kit-update` side files unless `--force`).
+
 ## What changed in 0.1.3
 
 - Added E2E testing baseline enforcement in `itx-gates` (`after_implement`):
@@ -18,7 +32,7 @@ Itexus accelerator for spec-driven AI delivery on top of `github/spec-kit`.
 
 - Cross-platform bootstrap scripts: `init-scripts/itx-init.sh`, `init-scripts/itx-init.ps1`
 - Base and domain presets:
-  - `presets/base` — constitution, templates, knowledge-base docs, and foundational architectural patterns
+  - `presets/base` — constitution, shared policy, governance YAML (`decision-authority.yml`, `input-contracts.yml`, `notification-events.yml`, `workflow-state-schema.yml`), templates, knowledge-base docs, and foundational architectural patterns
   - `presets/fintech-trading` — trading-specific constitution, constraints, and patterns (CQRS, cell-based HA)
   - `presets/fintech-banking` — banking-specific constitution, constraints, and patterns (event-sourced ledger, sagas, PSD2 gateway)
   - `presets/healthcare` — healthcare-specific constitution, constraints, and patterns (FHIR facade, zero-trust PHI)
@@ -51,6 +65,10 @@ itexus-spec-kit/
 │   ├── base/
 │   │   ├── constitution.md
 │   │   ├── policy.yml
+│   │   ├── decision-authority.yml
+│   │   ├── input-contracts.yml
+│   │   ├── notification-events.yml
+│   │   ├── workflow-state-schema.yml
 │   │   ├── docs/
 │   │   ├── design-patterns/
 │   │   ├── anti-patterns/
@@ -98,7 +116,7 @@ For backward compatibility the gate also recognizes inline backtick references t
 
 ## Architectural patterns
 
-**Base patterns** (always included): Domain-Driven Design, Hexagonal Architecture, Clean Architecture, Modular Monolith, Event-Driven Microservices, Transactional Outbox, CLI Orchestrator Architecture.
+**Base patterns** (always included): Domain-Driven Design, Hexagonal Architecture, Clean Architecture, Modular Monolith, Event-Driven Microservices, Transactional Outbox, E2E Testing Strategy, CLI Orchestrator Architecture.
 
 For tool-class projects (CLI tools, workflow engines, automation scripts), use
 the **Tool Plan** path from the constitution and prefer
@@ -143,6 +161,8 @@ Align with **`github/spec-kit`** so optional steps are not run in the wrong orde
 | 7 | `/speckit.implement` | |
 
 If **`/speckit.analyze`** reports that **`tasks.md` is missing**, run **`/speckit.tasks`** first and confirm the file exists in that feature folder.
+
+After implementation, use your review/cleanup extensions as needed. When the review pass is complete, run the **`after_review`** gate so completion readiness is validated before merge (see [Gate orchestration](#gate-orchestration)).
 
 ## Bootstrap usage
 
@@ -207,6 +227,7 @@ The patch script is idempotent and distinguishes two file categories:
 **User-editable** (may have been modified by `/speckit.constitution` or manual edits):
 - `.specify/constitution.md`
 - `.specify/policy.yml`
+- `.specify/decision-authority.yml`, `.specify/input-contracts.yml`, `.specify/notification-events.yml`, `.specify/workflow-state-schema.yml`
 - `docs/knowledge-base/*.md`
 
 By default, user-editable files are **never overwritten**. If the kit has a newer version, it is written as a `.kit-update` side-file (e.g., `constitution.md.kit-update`). Review the diff and merge manually:
@@ -238,13 +259,15 @@ python scripts/patch.py --workspace /path/to/project --kit-root /path/to/itexus-
 - `after_plan`: validates mandatory plan sections (Full Plan requires sections `4`, `4b`, `5`, and `13`; Patch Plan and Tool Plan use patch-plan requirements `1` and `2`)
 - `after_tasks`: requires at least one tasks file in supported locations and emits Tier 1 when a tasks file has bare list items (all task items must use checkbox syntax)
 - `after_implement`: validates E2E test presence/assertions before domain validators
+- `after_review`: validates delivery readiness (all tasks completed, no outstanding Tier 2 findings in gate feedback, E2E assertion baseline still met)
 
 Gate enforcement rules (mandatory sections, placeholder markers, retry limits) are loaded from `.specify/policy.yml`, which is copied from `presets/base/policy.yml` during bootstrap.
 
-Invocation contract:
+Invocation examples:
 
 ```bash
 python extensions/itx-gates/hooks/orchestrator.py --event=after_implement --workspace=/path/to/project
+python extensions/itx-gates/hooks/orchestrator.py --event=after_review --workspace=/path/to/project
 ```
 
 ## Assurance boundaries and control coverage
@@ -263,6 +286,7 @@ truth when assessing delivery assurance.
 | Plan presence and mandatory plan sections | `after_plan` gate in `orchestrator.py` (policy-driven) | **enforced** |
 | Tasks file presence and checkbox format | `after_tasks` gate in `orchestrator.py` | **enforced** |
 | E2E test file presence and assertion baseline | `after_implement` gate in `orchestrator.py` | **enforced** |
+| Completion readiness after review (tasks done, no Tier 2 outstanding, E2E still present) | `after_review` gate in `orchestrator.py` | **enforced** |
 | Tiered retry/escalation behavior | `orchestrator.py` + `.specify/policy.yml` | **enforced** |
 | Trading float money tripwire | `validators/trading_ast.py` | **enforced** |
 | Trading entrypoint idempotency and lifecycle/hot-path checks | `validators/trading_ast.py` + policy rule mapping | **enforced** |
@@ -333,19 +357,19 @@ This command:
 ### Bump release version
 
 ```bash
-python3 scripts/release.py --version 0.2.0
+python3 scripts/release.py --version 0.3.0
 ```
 
 With artifact rebuild:
 
 ```bash
-python3 scripts/release.py --version 0.2.0 --build
+python3 scripts/release.py --version 0.3.0 --build
 ```
 
 PowerShell equivalent:
 
 ```powershell
-.\scripts\tasks.ps1 -Task release -Version 0.2.0
+.\scripts\tasks.ps1 -Task release -Version 0.3.0
 .\scripts\tasks.ps1 -Task build-artifacts
 ```
 
@@ -385,4 +409,5 @@ Current focus:
 
 Already shipped baseline:
 
-- E2E and QA foundation in `0.1.3` (mandatory test strategy section, E2E gate checks, and QA/testing templates)
+- **0.2.0** — governance YAML in `.specify/`, `after_review` gate, `delivery-mechanics.md`, `done-report-template.md`, init/patch staging for autonomy contracts
+- **0.1.3** — E2E and QA foundation (mandatory test strategy section, E2E gate checks, QA/testing templates)
