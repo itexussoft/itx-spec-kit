@@ -4,6 +4,14 @@ Use this index for progressive loading during implementation.
 
 - `workflow-and-gates.md`: Tiered gate behavior and delivery flow
 - `domain-selection.md`: How domain overlays influence constraints
+- `delivery-mechanics.md`: Branching, commits, PR policy, and review feedback loop
+
+## Governance Artifacts
+
+- `decision-authority.yml`: Decision authority matrix for autonomous/propose/human outcomes
+- `input-contracts.yml`: Required/optional inputs and validation rules per workflow phase
+- `notification-events.yml`: Event contract for lifecycle, gate, approval, and error notifications
+- `workflow-state-schema.yml`: Persisted workflow-state structure for resumable execution
 
 ## Foundational Principles
 
@@ -36,3 +44,4 @@ Domain-specific patterns are layered on top during initialization based on the s
 - `patch-plan-template.md`: Lightweight plan template for scoped patch-level changes
 - `test-strategy-template.md`: Standalone test strategy template for implementation planning
 - `qa-checklist-template.md`: QA checklist for implementation review and handoff
+- `done-report-template.md`: Delivery completion report for traceability and merge handoff

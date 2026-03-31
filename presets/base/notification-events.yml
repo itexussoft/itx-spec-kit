@@ -1,0 +1,147 @@
+schema_version: "1.0"
+
+channels:
+  default: telegram
+  supported: [telegram, slack, email, webhook]
+
+event_schema:
+  required_fields:
+    - event_id
+    - event_type
+    - feature
+    - phase
+    - timestamp
+    - summary
+    - severity
+    - expects_response
+  optional_fields:
+    - details
+    - links
+    - response_schema
+    - correlation_id
+    - retry_count
+
+events:
+  - event_type: workflow.started
+    severity: info
+    expects_response: false
+    summary_template: "Workflow started for feature: {feature}"
+
+  - event_type: workflow.completed
+    severity: info
+    expects_response: false
+    summary_template: "Workflow completed for feature: {feature}"
+
+  - event_type: phase.started
+    severity: info
+    expects_response: false
+    summary_template: "Phase started: {phase}"
+
+  - event_type: phase.completed
+    severity: info
+    expects_response: false
+    summary_template: "Phase completed: {phase}"
+
+  - event_type: gate.passed
+    severity: info
+    expects_response: false
+    summary_template: "Gate passed: {gate_name}"
+
+  - event_type: gate.failed.tier1
+    severity: warning
+    expects_response: false
+    summary_template: "Tier 1 finding in gate: {gate_name}"
+
+  - event_type: gate.failed.tier2
+    severity: critical
+    expects_response: true
+    summary_template: "Tier 2 finding in gate: {gate_name}"
+    response_schema:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [approve_override, request_fix, abort_feature]
+        rationale:
+          type: string
+
+  - event_type: approval.request.spec
+    severity: info
+    expects_response: true
+    summary_template: "Spec approval requested"
+    response_schema:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [approve, reject]
+        comment:
+          type: string
+
+  - event_type: approval.request.plan
+    severity: info
+    expects_response: true
+    summary_template: "Plan approval requested"
+    response_schema:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [approve, reject]
+        comment:
+          type: string
+
+  - event_type: approval.request.merge
+    severity: info
+    expects_response: true
+    summary_template: "PR ready for human merge decision"
+    response_schema:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [merge, hold, close]
+        comment:
+          type: string
+
+  - event_type: decision.logged
+    severity: info
+    expects_response: false
+    summary_template: "Decision logged: {decision_key}"
+
+  - event_type: escalation.triggered
+    severity: warning
+    expects_response: true
+    summary_template: "Escalation triggered: {reason}"
+    response_schema:
+      type: object
+      required: [resolution]
+      properties:
+        resolution:
+          type: string
+          enum: [continue, pause, abort]
+        comment:
+          type: string
+
+  - event_type: error.runtime
+    severity: critical
+    expects_response: true
+    summary_template: "Runtime error encountered in phase: {phase}"
+    response_schema:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [retry, skip, abort]
+        comment:
+          type: string
+
+  - event_type: error.validation
+    severity: warning
+    expects_response: false
+    summary_template: "Validation error: {summary}"

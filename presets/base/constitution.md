@@ -61,3 +61,11 @@ For detailed rationale and examples, see `.specify/patterns/foundational-princip
 - The `after_implement` gate validates E2E test presence and basic assertion quality via naming conventions and file-content checks.
 - In `knowledge.mode: lazy`, `after_plan` also validates that selected pattern filenames are provided (for Full Plans) and resolvable.
 - Patch Plans may declare `<!-- selected_patterns: none -->` to explicitly opt out of pattern selection.
+
+## Delivery Mechanics
+
+25. Use feature-scoped branches named `feature/<slug>`. Keep each branch aligned with a single approved feature scope.
+26. Use commit prefixes to communicate intent: `spec:`, `plan:`, `tasks:`, `impl:`, `test:`, `docs:`, `fix:`.
+27. Create pull requests only after required gates pass and include traceability links (spec, plan, tasks, done report) plus test/gate evidence.
+28. PR merges always require explicit human action. Agents must not auto-merge.
+29. Treat PR review as a feedback loop: apply accepted comments, rerun affected checks, and log unresolved items/assumptions in delivery artifacts.

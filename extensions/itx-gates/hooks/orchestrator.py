@@ -131,6 +131,16 @@ _DEFAULT_POLICY: Dict[str, Any] = {
             "confidence": "heuristic",
             "remediation_owner": "security-team",
         },
+        "completion-tasks-unchecked": {
+            "severity": "tier1",
+            "confidence": "deterministic",
+            "remediation_owner": "feature-team",
+        },
+        "completion-tier2-outstanding": {
+            "severity": "tier2",
+            "confidence": "deterministic",
+            "remediation_owner": "feature-team",
+        },
     },
 }
 
@@ -347,6 +357,8 @@ RULE_REMEDIATION_HINTS: Dict[str, str] = {
     "e2e-test-empty": "Add explicit assertions that verify behavior outcomes and persisted side-effects.",
     "e2e-test-placeholder": "Replace placeholder TODO/pass bodies with executable test steps and assertions.",
     "e2e-test-family-empty": "Ensure each detected E2E test family has at least one file with assertions.",
+    "completion-tasks-unchecked": "Mark all implementation tasks as completed (`- [x]`) before running delivery checks.",
+    "completion-tier2-outstanding": "Resolve Tier 2 findings in gate_feedback.md or escalate for explicit human override.",
     "knowledge-pattern-selection-missing": "Declare selected pattern filenames using a structured selection block.",
     "knowledge-pattern-unresolved": "Fix pattern filenames to match entries from .specify/pattern-index.md.",
     "trading-idempotency-key-missing": "Require and persist idempotency keys for trading command entrypoints.",
@@ -913,6 +925,38 @@ def run_generic_checks(
             findings.extend(_validate_tasks_checkbox_format(task_files))
 
     if event == "after_implement":
+        findings.extend(check_e2e_test_presence(workspace))
+
+    if event == "after_review":
+        task_files = _find_task_files(workspace)
+        unchecked_count = 0
+        for task_file in task_files:
+            text = task_file.read_text(encoding="utf-8", errors="ignore")
+            unchecked_count += len(re.findall(r"^\s*-\s+\[\s\]\s+", text, flags=re.MULTILINE))
+        if unchecked_count > 0:
+            findings.append(
+                {
+                    "severity": TIER_1,
+                    "rule": "completion-tasks-unchecked",
+                    "message": (
+                        f"Found {unchecked_count} unchecked task checkbox item(s). "
+                        "All tasks must be completed before delivery."
+                    ),
+                }
+            )
+
+        feedback_path = workspace / ".specify" / "context" / "gate_feedback.md"
+        if feedback_path.exists():
+            feedback_text = feedback_path.read_text(encoding="utf-8", errors="ignore")
+            if "Severity: `tier2" in feedback_text:
+                findings.append(
+                    {
+                        "severity": TIER_2,
+                        "rule": "completion-tier2-outstanding",
+                        "message": "Outstanding Tier 2 findings detected in .specify/context/gate_feedback.md.",
+                    }
+                )
+
         findings.extend(check_e2e_test_presence(workspace))
 
     if config.get("execution_mode") == "docker-fallback":

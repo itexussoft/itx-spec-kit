@@ -88,3 +88,11 @@ rules:
     severity: tier1
     confidence: heuristic
     remediation_owner: security-team
+  completion-tasks-unchecked:
+    severity: tier1
+    confidence: deterministic
+    remediation_owner: feature-team
+  completion-tier2-outstanding:
+    severity: tier2
+    confidence: deterministic
+    remediation_owner: feature-team

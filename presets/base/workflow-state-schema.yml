@@ -1,0 +1,81 @@
+schema_version: "1.0"
+description: "Schema for persisted workflow state at .specify/context/workflow-state.yml"
+
+required:
+  - feature
+  - current_phase
+  - phases
+
+properties:
+  feature:
+    type: string
+    description: "Feature identifier or slug"
+
+  current_phase:
+    type: string
+    enum: [specify, clarify, plan, tasks, implement, review, deliver]
+
+  phases:
+    type: object
+    description: "Per-phase execution state"
+    additional_properties:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [pending, in_progress, completed, blocked]
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        artifacts:
+          type: array
+          items:
+            type: string
+        notes:
+          type: string
+
+  decisions:
+    type: array
+    description: "Decision log entries tied to decision-authority.yml"
+    items:
+      type: object
+      required: [key, authority, outcome, timestamp]
+      properties:
+        key:
+          type: string
+        authority:
+          type: string
+          enum: [autonomous, propose, human]
+        outcome:
+          type: string
+        rationale:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+  errors:
+    type: array
+    description: "Execution and validation errors encountered during workflow"
+    items:
+      type: object
+      required: [phase, type, message, timestamp]
+      properties:
+        phase:
+          type: string
+          enum: [specify, clarify, plan, tasks, implement, review, deliver]
+        type:
+          type: string
+          enum: [runtime, validation, gate, integration]
+        message:
+          type: string
+        severity:
+          type: string
+          enum: [info, warning, critical]
+        timestamp:
+          type: string
+          format: date-time

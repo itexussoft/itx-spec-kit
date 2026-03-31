@@ -1,0 +1,90 @@
+schema_version: "1.0"
+
+phases:
+  specify:
+    required_inputs:
+      - feature_request
+      - constitutional_context
+    optional_inputs:
+      - domain_preset
+      - prior_related_specs
+    validation:
+      - "feature_request is non-empty"
+      - "constitutional_context includes active constitution.md"
+
+  clarify:
+    required_inputs:
+      - spec_document
+    optional_inputs:
+      - stakeholder_answers
+    validation:
+      - "spec_document exists at .specify/specs/<feature>/spec.md"
+      - "all required sections in spec are present"
+
+  plan:
+    required_inputs:
+      - spec_document
+      - selected_plan_template
+      - constitution_rules
+      - pattern_index
+    optional_inputs:
+      - clarification_log
+      - risk_history
+    validation:
+      - "selected_plan_template in [full-plan-template.md, patch-plan-template.md]"
+      - "plan includes required sections for chosen tier"
+
+  tasks:
+    required_inputs:
+      - approved_plan
+      - task_template
+    optional_inputs:
+      - implementation_constraints
+    validation:
+      - "tasks.md exists"
+      - "each task references plan section and requirement id"
+
+  implement:
+    required_inputs:
+      - tasks_document
+      - plan_document
+      - repository_state
+    optional_inputs:
+      - test_fixtures
+      - mocks
+    validation:
+      - "at least one unchecked task exists before implementation start"
+      - "working tree clean or changes attributable to current feature branch"
+
+  review:
+    required_inputs:
+      - implementation_diff
+      - gate_feedback
+      - test_results
+    optional_inputs:
+      - reviewer_notes
+    validation:
+      - "after_implement gate passed or findings recorded"
+      - "all Tier 2 findings resolved or explicitly escalated"
+
+  deliver:
+    required_inputs:
+      - done_report
+      - pr_link
+      - final_gate_feedback
+    optional_inputs:
+      - release_notes
+    validation:
+      - "done_report exists and all required sections filled"
+      - "PR created and merge state is awaiting human action"
+
+cross_phase_rules:
+  - id: state-file-required
+    description: "Workflow state must be persisted after each phase transition"
+    applies_to: [specify, clarify, plan, tasks, implement, review, deliver]
+  - id: assumptions-log-required
+    description: "Any inferred value must be logged as an explicit assumption"
+    applies_to: [clarify, plan, implement, review]
+  - id: decision-log-required
+    description: "Authority-based decisions must be appended to decision log"
+    applies_to: [plan, implement, review, deliver]

@@ -27,6 +27,10 @@ provides:
       file: "commands/after_implement.md"
       description: "Run itx-gates after implementation"
 
+    - name: "speckit.itx-gates.after-review"
+      file: "commands/after_review.md"
+      description: "Run itx-gates after review"
+
     - name: "speckit.itx-gates.review-run"
       file: "commands/review_run.md"
       description: "Run spec-kit-review via the universal runner adapter"
@@ -55,6 +59,13 @@ hooks:
     optional: false
     prompt: ""
     description: "Itexus quality gates after implementation"
+    condition: null
+
+  after_review:
+    command: "speckit.itx-gates.after-review"
+    optional: false
+    prompt: ""
+    description: "Itexus quality gates after review"
     condition: null
 
 tags:

@@ -45,6 +45,11 @@ provides:
       file: "templates/qa-checklist-template.md"
       description: "QA checklist for reviewing AI-generated implementation code"
 
+    - type: "template"
+      name: "done-report"
+      file: "templates/done-report-template.md"
+      description: "Completion report template for delivery traceability and merge handoff"
+
   patterns:
     - type: "pattern"
       name: "domain-driven-design"

@@ -13,6 +13,8 @@ Delivery stages:
 9. Implement (`/speckit.implement`)
 10. **`after_implement` gate** — validates E2E test presence and assertion quality, then runs domain-specific validators
 11. Test / Cleanup / Review (extensions + gates)
+12. **`after_review` gate** — validates delivery readiness (all tasks completed, no outstanding Tier 2 feedback, E2E checks still present)
+13. Deliver — prepare done report and open PR for human merge decision
 
 If **`/speckit.analyze` is blocked** with "tasks.md not found", run **`/speckit.tasks`** again (and ensure spec + plan exist for that feature).
 
@@ -56,6 +58,7 @@ Gate enforcement rules (mandatory sections, placeholder markers, retry limits) a
 | `after_plan` | `/speckit.plan` | Plan file exists; Full Plan requires Sections 4, 4b, 5, and 13 with real content; Patch Plan and Tool Plan require Sections 1 and 2 with real content. In lazy mode, selected pattern filenames are resolved from the knowledge manifest or local knowledge store. |
 | `after_tasks` | `/speckit.tasks` | At least one `tasks.md` exists in supported locations (`specs/**`, `.specify/`, or workspace root), and checkbox format is validated. |
 | `after_implement` | `/speckit.implement` | E2E test files exist and include assertions, then domain-specific validators run. Docker preflight connectivity is checked on every gate event when `execution_mode` is `docker-fallback`. |
+| `after_review` | Review completion | All tasks are marked complete, no outstanding Tier 2 findings remain in gate feedback, and E2E assertions are still present. |
 
 ## Testing validation rules
 
@@ -102,6 +105,7 @@ This matrix defines how strongly each control is currently enforced:
 | Plan structure and required sections | `after_plan` + `.specify/policy.yml` | **enforced** |
 | Tasks presence and checkbox syntax | `after_tasks` validator | **enforced** |
 | E2E test file and assertion baseline | `after_implement` generic checks | **enforced** |
+| Completion readiness (all tasks done + no Tier 2 outstanding) | `after_review` generic checks | **enforced** |
 | Domain tripwire checks (trading/banking/healthcare) | Domain validators in `hooks/validators/` | **enforced** |
 | Banking payment invariants (`idempotency-key`, in-place ledger mutation) | Banking validator + policy `rules` metadata | **enforced** |
 | Retry and escalation policy | Retry-state logic in `orchestrator.py` | **enforced** |

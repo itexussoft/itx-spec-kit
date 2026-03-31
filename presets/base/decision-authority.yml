@@ -1,0 +1,128 @@
+schema_version: "1.0"
+
+authority_levels:
+  autonomous:
+    description: "Agent decides, logs rationale, continues without human input"
+  propose:
+    description: "Agent drafts recommendation, sends for async human approval, waits"
+  human:
+    description: "Agent blocks and notifies human; cannot proceed without explicit decision"
+
+decisions:
+  # --- Phase Transitions ---
+  phase_transition.specify_start:
+    authority: autonomous
+    trigger: "Feature request received"
+    constraint: "input-contracts.yml/specify must be satisfied"
+
+  phase_transition.clarify_skip:
+    authority: autonomous
+    trigger: "Spec complete, no ambiguities detected"
+    constraint: "Spec has no empty required sections and no unresolved inline questions"
+
+  phase_transition.clarify_invoke:
+    authority: autonomous
+    trigger: "Spec contains ambiguities or placeholder content"
+    constraint: "Agent must enumerate specific questions, not generic requests"
+
+  phase_transition.plan_advance:
+    authority: autonomous
+    trigger: "after_plan gate passed"
+
+  phase_transition.tasks_advance:
+    authority: autonomous
+    trigger: "after_tasks gate passed"
+
+  phase_transition.implement_advance:
+    authority: autonomous
+    trigger: "after_implement gate passed"
+
+  # --- Design Decisions ---
+  design.plan_tier_selection:
+    authority: autonomous
+    trigger: "Agent begins /speckit.plan"
+    constraint: "Follow constitution rule 6 criteria: Full Plan if new Bounded Context/Aggregate/cross-context integration; Patch Plan otherwise"
+    log_required: true
+
+  design.pattern_selection:
+    authority: autonomous
+    trigger: "Agent fills plan Section 4"
+    constraint: "Must select from pattern-index.md; validated by after_plan gate"
+
+  design.implementation_approach:
+    authority: autonomous
+    trigger: "Agent begins /speckit.implement"
+    constraint: "Must follow plan design decisions; deviation requires plan amendment"
+
+  # --- Approval Gates ---
+  approval.spec:
+    authority: propose
+    trigger: "Spec produced"
+    condition: "plan_tier == system"
+    fallback_if_no_response:
+      action: wait
+      timeout_hours: 24
+      escalation: "Resend notification with urgency bump"
+    override:
+      condition: "plan_tier == patch"
+      authority: autonomous
+
+  approval.plan:
+    authority: propose
+    trigger: "Plan produced and after_plan gate passed"
+    condition: "plan_tier == system"
+    fallback_if_no_response:
+      action: wait
+      timeout_hours: 24
+    override:
+      condition: "plan_tier == patch"
+      authority: autonomous
+
+  approval.pr_merge:
+    authority: human
+    trigger: "PR created, all gates passed"
+    constraint: "Always requires human; no auto-merge"
+
+  # --- Escalation ---
+  escalation.tier2_failure:
+    authority: human
+    trigger: "Gate returns Tier 2 finding"
+    constraint: "Agent must include finding details and suggested remediation in notification"
+
+  escalation.tier1_retry_exhausted:
+    authority: human
+    trigger: "Tier 1 finding exceeds retry limit"
+    constraint: "Agent must include retry history and attempted fixes"
+
+  escalation.open_questions:
+    authority: propose
+    trigger: "Plan Section 12 contains unresolved questions"
+    condition: "question.blocks_implementation == true"
+    override:
+      condition: "question.blocks_implementation == false"
+      authority: autonomous
+      constraint: "Log assumption explicitly in plan; mark as 'agent-assumed'"
+
+  escalation.high_risk:
+    authority: human
+    trigger: "Risk rated High likelihood AND High impact in plan Section 11"
+
+  escalation.compliance_risk:
+    authority: human
+    trigger: "Compliance risk identified in spec or plan"
+    constraint: "Any PCI, HIPAA, PSD2, or SOC2 compliance concern"
+
+  # --- Scope Changes ---
+  scope.abort_feature:
+    authority: human
+    trigger: "Feature cancelled or deprioritized"
+
+  scope.change_mid_implementation:
+    authority: human
+    trigger: "Requirements change after tasks phase"
+    constraint: "Requires re-planning from /speckit.plan"
+
+  scope.override_gate_finding:
+    authority: human
+    trigger: "Human explicitly overrides a gate finding"
+    constraint: "Must record override rationale in gate_feedback.md"
