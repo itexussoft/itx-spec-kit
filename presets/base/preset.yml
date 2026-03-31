@@ -74,6 +74,10 @@ provides:
       name: "e2e-testing-strategy"
       file: "patterns/e2e-testing-strategy.md"
       description: "E2E testing rules: one test per journey, containers over mocks, naming conventions"
+    - type: "pattern"
+      name: "cli-orchestrator-architecture"
+      file: "patterns/cli-orchestrator-architecture.md"
+      description: "AI-first architecture for CLI tools, workflow engines, and automation scripts"
 
   design_patterns:
     - type: "design-pattern"
@@ -126,6 +130,10 @@ provides:
       name: "visitor-boilerplate"
       file: "anti-patterns/visitor-boilerplate.md"
       description: "Forbids classic Visitor; enforces native pattern matching"
+    - type: "anti-pattern"
+      name: "over-engineered-cli"
+      file: "anti-patterns/over-engineered-cli.md"
+      description: "Forbids applying DDD/Hexagonal enterprise patterns to tool-class projects"
 
 tags:
   - "itexus"

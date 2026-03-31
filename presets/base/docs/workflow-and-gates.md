@@ -5,7 +5,7 @@ Delivery stages:
 1. Constitution (`/speckit.constitution`)
 2. Specify (`/speckit.specify`)
 3. Clarify (`/speckit.clarify`, optional)
-4. Plan (`/speckit.plan`) — read `.specify/pattern-index.md`, select relevant pattern files, and produce a System Design Plan (`system-design-plan-template.md` or `patch-plan-template.md`). In lazy knowledge mode, read full candidate pattern content from `.specify/.knowledge-store/` during planning.
+4. Plan (`/speckit.plan`) — read `.specify/pattern-index.md`, select relevant pattern files, and produce a System Design Plan (`system-design-plan-template.md`) or a patch/tool plan (`patch-plan-template.md`). In lazy knowledge mode, read full candidate pattern content from `.specify/.knowledge-store/` during planning.
 5. **`after_plan` gate** — validates plan presence + mandatory sections; in lazy knowledge mode, materializes only selected pattern files into `.specify/`
 6. Tasks (`/speckit.tasks`) — produces **`tasks.md`** in the active feature directory using `tasks-template.md` as format reference. Every task **must** use `- [ ]` checkbox syntax.
 7. **`after_tasks` gate** — validates tasks file presence and checkbox format
@@ -53,7 +53,7 @@ Gate enforcement rules (mandatory sections, placeholder markers, retry limits) a
 
 | Hook | Fires After | Validates |
 |------|------------|-----------|
-| `after_plan` | `/speckit.plan` | Plan file exists; Full Plan requires Sections 4, 4b, 5, and 13 with real content; Patch Plan requires Sections 1 and 2 with real content. In lazy mode, selected pattern filenames are resolved from the knowledge manifest or local knowledge store. |
+| `after_plan` | `/speckit.plan` | Plan file exists; Full Plan requires Sections 4, 4b, 5, and 13 with real content; Patch Plan and Tool Plan require Sections 1 and 2 with real content. In lazy mode, selected pattern filenames are resolved from the knowledge manifest or local knowledge store. |
 | `after_tasks` | `/speckit.tasks` | At least one `tasks.md` exists in supported locations (`specs/**`, `.specify/`, or workspace root), and checkbox format is validated. |
 | `after_implement` | `/speckit.implement` | E2E test files exist and include assertions, then domain-specific validators run. Docker preflight connectivity is checked on every gate event when `execution_mode` is `docker-fallback`. |
 

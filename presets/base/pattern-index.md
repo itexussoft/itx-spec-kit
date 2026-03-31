@@ -8,6 +8,7 @@
 - `event-driven-microservices.md`: Asynchronous event-based integration across services
 - `transactional-outbox.md`: Reliable event publishing using transactional outbox
 - `e2e-testing-strategy.md`: E2E testing rules: one test per journey, containers over mocks, naming conventions
+- `cli-orchestrator-architecture.md`: AI-first architecture for CLI tools, workflow engines, and automation scripts
 
 ## Code-Level Design Patterns
 - `value-object-and-result-monad.md`: DDD Value Objects and Result Monad error handling over exceptions
@@ -24,3 +25,4 @@
 - `manual-singleton.md`: Strictly forbids manual Singleton; enforces DI/IoC
 - `template-method-inheritance.md`: Warns against deep inheritance; enforces Strategy/HOF
 - `visitor-boilerplate.md`: Forbids classic Visitor; enforces native pattern matching
+- `over-engineered-cli.md`: Forbids applying DDD/Hexagonal enterprise patterns to tool-class projects

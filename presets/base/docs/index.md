@@ -20,8 +20,13 @@ Base patterns (available in `.specify/patterns/` after initialization):
 - `event-driven-microservices.md`: Eventual consistency and async communication
 - `transactional-outbox.md`: Reliable messaging to prevent dual-write data loss
 - `e2e-testing-strategy.md`: E2E testing rules for journey coverage, infrastructure, isolation, and assertions
+- `cli-orchestrator-architecture.md`: AI-first architecture for CLI tools, workflow engines, and automation scripts
 
 Domain-specific patterns are layered on top during initialization based on the selected domain.
+
+## Anti-Patterns
+
+- `over-engineered-cli.md`: Avoid applying heavyweight DDD/Hexagonal architecture to tool-class projects where explicit orchestration is sufficient
 
 ## Templates
 

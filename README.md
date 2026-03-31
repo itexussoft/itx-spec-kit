@@ -98,7 +98,11 @@ For backward compatibility the gate also recognizes inline backtick references t
 
 ## Architectural patterns
 
-**Base patterns** (always included): Domain-Driven Design, Hexagonal Architecture, Clean Architecture, Modular Monolith, Event-Driven Microservices, Transactional Outbox.
+**Base patterns** (always included): Domain-Driven Design, Hexagonal Architecture, Clean Architecture, Modular Monolith, Event-Driven Microservices, Transactional Outbox, CLI Orchestrator Architecture.
+
+For tool-class projects (CLI tools, workflow engines, automation scripts), use
+the **Tool Plan** path from the constitution and prefer
+`cli-orchestrator-architecture.md` over DDD tactical layering.
 
 **Domain patterns** (added per domain selection):
 
@@ -231,7 +235,7 @@ python scripts/patch.py --workspace /path/to/project --kit-root /path/to/itexus-
 
 - Tier 1 (auto-correction): writes `.specify/context/gate_feedback.md` and exits `0`
 - Tier 2 (hard halt): writes `.specify/context/gate_feedback.md` and exits `1`
-- `after_plan`: validates mandatory plan sections (Full Plan requires sections `4`, `4b`, `5`, and `13`)
+- `after_plan`: validates mandatory plan sections (Full Plan requires sections `4`, `4b`, `5`, and `13`; Patch Plan and Tool Plan use patch-plan requirements `1` and `2`)
 - `after_tasks`: requires at least one tasks file in supported locations and emits Tier 1 when a tasks file has bare list items (all task items must use checkbox syntax)
 - `after_implement`: validates E2E test presence/assertions before domain validators
 

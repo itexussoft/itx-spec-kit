@@ -17,3 +17,4 @@ dist/
 .idea/
 .vscode/
 *.log
+itx-agent-plan.md

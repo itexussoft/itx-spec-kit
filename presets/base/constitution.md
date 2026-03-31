@@ -12,9 +12,10 @@
 ## Architectural Design Requirements
 
 5. During `/speckit.plan`, read `.specify/pattern-index.md` for the catalog of available patterns, design-patterns, and anti-patterns. Explicitly reference selected pattern filenames in the plan before implementation. In lazy knowledge mode, use a structured selection block (`<!-- selected_patterns: file.md, ... -->`) so the gate can materialize them, and read candidate pattern content from `.specify/.knowledge-store/` to inform selections.
-6. During `/speckit.plan`, choose one of two plan tiers:
+6. During `/speckit.plan`, choose one of three plan tiers:
    - **Full Plan**: required when a feature introduces new Bounded Contexts, new Aggregates, or cross-service/context integrations. Use `system-design-plan-template.md`; Sections 4, 4b, and 5 are mandatory.
    - **Patch Plan**: allowed when a change is scoped to existing modules and introduces no new Bounded Contexts/Aggregates. Use `patch-plan-template.md`; pattern selection is optional.
+   - **Tool Plan**: uses `patch-plan-template.md` for CLI tools, automation scripts, workflow engines, and infrastructure projects where DDD tactical patterns (Bounded Contexts, Aggregates, Repositories) do not apply. Prefer `cli-orchestrator-architecture.md` and related patterns. Rules 7, 9, 10, 11, and 12 do not apply to Tool Plan projects.
 7. Every **Full Plan** must explicitly name which DDD Bounded Contexts, Aggregates, and pattern files from `.specify/patterns/` the design relies on. If the design does not use a pattern, state why.
 8. Record significant architectural decisions using the `architecture-decision-record-template.md` template and store them in `docs/adr/`.
 
@@ -29,6 +30,7 @@
 ## Core AI Operating Principles (Timeless Foundations)
 
 14. **Separation of Concerns:** Clear module boundaries are mandatory. You must ensure code is navigable by both humans and AI agents. Do not create "God Classes" or massive files that will overwhelm future context windows.
+14b. **AI-First Readability:** Code must be understandable by an AI agent reading a single file in isolation. Maximize local reasoning: keep files under ~300 lines where practical, limit module hierarchy to two levels, and keep call depth from entry point to core logic shallow. See `.specify/patterns/cli-orchestrator-architecture.md` for details.
 15. **KISS (Keep It Simple, Stupid):** As an AI, resist the temptation to over-engineer or generate massive enterprise boilerplates when a simple solution suffices. Simplicity is your primary defense against accidental complexity.
 16. **YAGNI (You Aren't Gonna Need It):** Strictly resist speculative abstraction. Build exactly what is required for the current prompt/spec and nothing more. We will refactor when the pattern becomes clear in future iterations.
 17. **DRY (Don't Repeat Yourself) with Nuance:** Premature DRY is worse than mild duplication. Do not extract shared code or create base classes prematurely. Strictly adhere to the **"Rule of Three"** before extracting shared logic.
@@ -42,6 +44,7 @@ For detailed rationale and examples, see `.specify/patterns/foundational-princip
 
 19. Every feature must include E2E tests for each user journey declared in the spec Scope. E2E tests must verify the full path from API entry to persistence and event publication where applicable.
 20. E2E tests must use real infrastructure boundaries (containers or equivalent in-memory runtime dependencies) rather than mocking internal repositories and domain services. External third-party APIs may use contract stubs.
+19b. For Tool Plan projects without API entrypoints, E2E tests must verify the CLI boundary: invoke the tool as a subprocess, assert exit codes, stdout/stderr diagnostics, and produced state/artifact files. Infrastructure containers are not required when dependencies are mocked at subprocess boundaries.
 21. E2E test files must follow discoverable naming conventions: `e2e_test_*.py`, `*.e2e-spec.js`, `*.e2e-spec.ts`, `*.e2e.test.js`, or `*.e2e.test.ts`.
 22. Each E2E test must be independent: no shared mutable state, no execution-order dependencies, and explicit setup/teardown (or transactional rollback) per test.
 23. Patch Plan implementations must include at least one regression E2E or integration test that covers the changed behavior path.
