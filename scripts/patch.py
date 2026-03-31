@@ -138,8 +138,18 @@ def patch_workspace(kit_root: Path, workspace: Path, force: bool = False) -> Tup
     docs_src = kit_root / "presets" / "base" / "docs"
     docs_dst = workspace / "docs" / "knowledge-base"
     if docs_src.exists() and docs_dst.exists():
-        for name in ("workflow-and-gates.md", "index.md", "domain-selection.md"):
+        for name in ("workflow-and-gates.md", "index.md", "domain-selection.md", "delivery-mechanics.md"):
             editable_files.append((docs_src / name, docs_dst / name))
+
+    base_preset = kit_root / "presets" / "base"
+    specify_dir = workspace / ".specify"
+    for name in (
+        "decision-authority.yml",
+        "input-contracts.yml",
+        "notification-events.yml",
+        "workflow-state-schema.yml",
+    ):
+        editable_files.append((base_preset / name, specify_dir / name))
 
     # ---- Kit-owned templates: always overwrite into .specify/templates/ ----
 

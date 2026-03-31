@@ -221,7 +221,7 @@ def stage_docs_and_policy(kit_root: Path, workspace: Path, domain: str) -> None:
     (workspace / "docs" / "knowledge-base").mkdir(parents=True, exist_ok=True)
 
     base_docs = kit_root / "presets" / "base" / "docs"
-    for filename in ("index.md", "workflow-and-gates.md", "domain-selection.md"):
+    for filename in ("index.md", "workflow-and-gates.md", "domain-selection.md", "delivery-mechanics.md"):
         src = base_docs / filename
         if src.exists():
             shutil.copy2(src, workspace / "docs" / "knowledge-base" / filename)
@@ -229,6 +229,17 @@ def stage_docs_and_policy(kit_root: Path, workspace: Path, domain: str) -> None:
     policy_src = kit_root / "presets" / "base" / "policy.yml"
     if policy_src.exists():
         shutil.copy2(policy_src, workspace / ".specify" / "policy.yml")
+
+    base_preset = kit_root / "presets" / "base"
+    for filename in (
+        "decision-authority.yml",
+        "input-contracts.yml",
+        "notification-events.yml",
+        "workflow-state-schema.yml",
+    ):
+        src = base_preset / filename
+        if src.exists():
+            shutil.copy2(src, workspace / ".specify" / filename)
 
     if domain != "base":
         copy_tree_contents(kit_root / "presets" / domain / "docs", workspace / "docs" / "knowledge-base")
