@@ -3,7 +3,7 @@ schema_version: "1.0"
 preset:
   id: "healthcare"
   name: "Itexus Healthcare Preset"
-  version: 0.1.3
+  version: 0.2.0
   description: "Healthcare domain overlay for Itexus spec-driven delivery"
   author: "itexus"
   repository: "https://github.com/sprivalov/itexus-spec-kit"
