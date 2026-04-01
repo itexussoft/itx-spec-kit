@@ -149,6 +149,9 @@ Do not keep long-running daemon loops unless required by constraints.
 Exit-and-resume is easier to debug, cheaper to operate, and safer for local
 development workflows.
 
+When overlapping async I/O (continuous ingestion, chat, HTTP to a co-located
+API) requires a persistent process, follow `asynchronous-event-loop-architecture.md`.
+
 ---
 
 ## 7. Testing Strategy for CLI Orchestrators

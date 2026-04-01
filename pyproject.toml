@@ -1,6 +1,6 @@
 [project]
 name = "itexus-spec-kit"
-version = "0.2.0"
+version = "0.2.1"
 description = "Itexus accelerator for spec-driven AI delivery on top of github/spec-kit"
 requires-python = ">=3.10"
 dependencies = [

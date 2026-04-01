@@ -2,7 +2,11 @@
 
 Itexus accelerator for spec-driven AI delivery on top of `github/spec-kit`.
 
-**Kit version** is declared in [`catalog/index.json`](catalog/index.json) as `kit.version` (currently **0.2.0**).
+**Kit version** is declared in [`catalog/index.json`](catalog/index.json) as `kit.version` (currently **0.2.1**).
+
+## What changed in 0.2.1
+
+- **Architectural pattern:** `asynchronous-event-loop-architecture.md` — single-process `asyncio` guidance for integration daemons (log watch, chat, HTTP sidecars), with Tool Plan and constitution cross-references; complements `cli-orchestrator-architecture.md` exit-and-resume defaults.
 
 ## What changed in 0.2.0
 
@@ -409,5 +413,6 @@ Current focus:
 
 Already shipped baseline:
 
+- **0.2.1** — `asynchronous-event-loop-architecture.md` pattern for asyncio integration daemons; Tool Plan constitution alignment
 - **0.2.0** — governance YAML in `.specify/`, `after_review` gate, `delivery-mechanics.md`, `done-report-template.md`, init/patch staging for autonomy contracts
 - **0.1.3** — E2E and QA foundation (mandatory test strategy section, E2E gate checks, QA/testing templates)

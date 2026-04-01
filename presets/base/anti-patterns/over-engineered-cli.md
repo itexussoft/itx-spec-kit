@@ -127,4 +127,6 @@ Flag this anti-pattern when all are true:
 ## References
 
 - See also: `../patterns/cli-orchestrator-architecture.md`,
+  `../patterns/asynchronous-event-loop-architecture.md` (daemon-class
+  integration with asyncio, not DDD layering),
   `../patterns/foundational-principles.md`.

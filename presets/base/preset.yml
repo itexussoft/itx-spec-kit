@@ -3,7 +3,7 @@ schema_version: "1.0"
 preset:
   id: "base"
   name: "Itexus Base Preset"
-  version: 0.2.0
+  version: 0.2.1
   description: "Base constitution and spec template overrides for Itexus projects"
   author: "itexus"
   repository: "https://github.com/sprivalov/itexus-spec-kit"
@@ -83,6 +83,10 @@ provides:
       name: "cli-orchestrator-architecture"
       file: "patterns/cli-orchestrator-architecture.md"
       description: "AI-first architecture for CLI tools, workflow engines, and automation scripts"
+    - type: "pattern"
+      name: "asynchronous-event-loop-architecture"
+      file: "patterns/asynchronous-event-loop-architecture.md"
+      description: "Single-process asyncio daemons for concurrent I/O integration (log watch, chat, HTTP sidecars)"
 
   design_patterns:
     - type: "design-pattern"

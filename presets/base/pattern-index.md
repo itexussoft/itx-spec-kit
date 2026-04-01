@@ -9,6 +9,7 @@
 - `transactional-outbox.md`: Reliable event publishing using transactional outbox
 - `e2e-testing-strategy.md`: E2E testing rules: one test per journey, containers over mocks, naming conventions
 - `cli-orchestrator-architecture.md`: AI-first architecture for CLI tools, workflow engines, and automation scripts
+- `asynchronous-event-loop-architecture.md`: Single-process asyncio daemons for concurrent I/O integration (log watch, chat, HTTP sidecars)
 
 ## Code-Level Design Patterns
 - `value-object-and-result-monad.md`: DDD Value Objects and Result Monad error handling over exceptions

@@ -15,7 +15,7 @@
 6. During `/speckit.plan`, choose one of three plan tiers:
    - **Full Plan**: required when a feature introduces new Bounded Contexts, new Aggregates, or cross-service/context integrations. Use `system-design-plan-template.md`; Sections 4, 4b, and 5 are mandatory.
    - **Patch Plan**: allowed when a change is scoped to existing modules and introduces no new Bounded Contexts/Aggregates. Use `patch-plan-template.md`; pattern selection is optional.
-   - **Tool Plan**: uses `patch-plan-template.md` for CLI tools, automation scripts, workflow engines, and infrastructure projects where DDD tactical patterns (Bounded Contexts, Aggregates, Repositories) do not apply. Prefer `cli-orchestrator-architecture.md` and related patterns. Rules 7, 9, 10, 11, and 12 do not apply to Tool Plan projects.
+   - **Tool Plan**: uses `patch-plan-template.md` for CLI tools, automation scripts, workflow engines, and infrastructure projects where DDD tactical patterns (Bounded Contexts, Aggregates, Repositories) do not apply. Prefer `cli-orchestrator-architecture.md` and related patterns; use `asynchronous-event-loop-architecture.md` for long-running integration daemons that need overlapping async I/O (for example log watch plus chat plus HTTP sidecars). Rules 7, 9, 10, 11, and 12 do not apply to Tool Plan projects.
 7. Every **Full Plan** must explicitly name which DDD Bounded Contexts, Aggregates, and pattern files from `.specify/patterns/` the design relies on. If the design does not use a pattern, state why.
 8. Record significant architectural decisions using the `architecture-decision-record-template.md` template and store them in `docs/adr/`.
 

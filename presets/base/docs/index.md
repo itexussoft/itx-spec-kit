@@ -29,6 +29,7 @@ Base patterns (available in `.specify/patterns/` after initialization):
 - `transactional-outbox.md`: Reliable messaging to prevent dual-write data loss
 - `e2e-testing-strategy.md`: E2E testing rules for journey coverage, infrastructure, isolation, and assertions
 - `cli-orchestrator-architecture.md`: AI-first architecture for CLI tools, workflow engines, and automation scripts
+- `asynchronous-event-loop-architecture.md`: Single-process asyncio daemons for concurrent I/O integration (log watch, chat, HTTP sidecars)
 
 Domain-specific patterns are layered on top during initialization based on the selected domain.
 
