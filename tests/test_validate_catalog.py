@@ -4,7 +4,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 VALIDATE_SCRIPT = ROOT / "scripts" / "validate_catalog.py"
 
@@ -41,20 +40,17 @@ class ValidateCatalogTests(unittest.TestCase):
             'schema_version: "1.0"\n'
             "preset:\n"
             '  id: "base"\n'
-            "  version: \"0.1.0\"\n"
+            '  version: "0.1.0"\n'
             "provides:\n"
             "  templates:\n"
-            "    - type: \"template\"\n"
-            "      name: \"stub\"\n"
-            "      file: \"templates/stub.md\"\n"
-            "      description: \"catalog test stub\"\n",
+            '    - type: "template"\n'
+            '      name: "stub"\n'
+            '      file: "templates/stub.md"\n'
+            '      description: "catalog test stub"\n',
             encoding="utf-8",
         )
         (tmp / "extensions" / "itx-gates" / "extension.yml").write_text(
-            'schema_version: "1.0"\n'
-            "extension:\n"
-            '  id: "itx-gates"\n'
-            "  version: \"0.1.0\"\n",
+            'schema_version: "1.0"\nextension:\n  id: "itx-gates"\n  version: "0.1.0"\n',
             encoding="utf-8",
         )
 
@@ -78,13 +74,13 @@ class ValidateCatalogTests(unittest.TestCase):
                 'schema_version: "1.0"\n'
                 "preset:\n"
                 '  id: "base"\n'
-                "  version: \"0.1.9\"\n"
+                '  version: "0.1.9"\n'
                 "provides:\n"
                 "  templates:\n"
-                "    - type: \"template\"\n"
-                "      name: \"stub\"\n"
-                "      file: \"templates/stub.md\"\n"
-                "      description: \"catalog test stub\"\n",
+                '    - type: "template"\n'
+                '      name: "stub"\n'
+                '      file: "templates/stub.md"\n'
+                '      description: "catalog test stub"\n',
                 encoding="utf-8",
             )
             self.assertEqual(self.run_main_with_workspace(ws), 1)
@@ -101,12 +97,7 @@ class ValidateCatalogTests(unittest.TestCase):
             ws = Path(tmp)
             self.make_workspace(ws)
             (ws / "presets" / "base" / "preset.yml").write_text(
-                'schema_version: "1.0"\n'
-                "preset:\n"
-                '  id: "base"\n'
-                "  version: \"0.1.0\"\n"
-                "provides:\n"
-                "  patterns: []\n",
+                'schema_version: "1.0"\npreset:\n  id: "base"\n  version: "0.1.0"\nprovides:\n  patterns: []\n',
                 encoding="utf-8",
             )
             self.assertEqual(self.run_main_with_workspace(ws), 1)
@@ -116,10 +107,7 @@ class ValidateCatalogTests(unittest.TestCase):
             ws = Path(tmp)
             self.make_workspace(ws)
             (ws / "extensions" / "itx-gates" / "extension.yml").write_text(
-                'schema_version: "1.0"\n'
-                "extension:\n"
-                '  id: "itx-gates"\n'
-                "  version: \"0.2.0\"\n",
+                'schema_version: "1.0"\nextension:\n  id: "itx-gates"\n  version: "0.2.0"\n',
                 encoding="utf-8",
             )
             self.assertEqual(self.run_main_with_workspace(ws), 1)

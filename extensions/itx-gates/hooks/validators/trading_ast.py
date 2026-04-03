@@ -12,7 +12,10 @@ from validators import Finding, collect_code_files
 TS_MONEY_NUMBER_RE = re.compile(r"\b(price|amount)\b\s*:\s*number\b", re.IGNORECASE)
 TS_PARSE_FLOAT_RE = re.compile(r"\b(price|amount)\b\s*=\s*parseFloat\(", re.IGNORECASE)
 TS_NUMBER_CAST_RE = re.compile(r"\b(price|amount)\b\s*=\s*Number\(", re.IGNORECASE)
-ENTRYPOINT_RE = re.compile(r"(@router\.(post|put|patch)|@app\.route\s*\(.*(post|put|patch)|\bdef\s+(create|submit|place)_?order)", re.IGNORECASE)
+ENTRYPOINT_RE = re.compile(
+    r"(@router\.(post|put|patch)|@app\.route\s*\(.*(post|put|patch)|\bdef\s+(create|submit|place)_?order)",
+    re.IGNORECASE,
+)
 IDEMPOTENCY_RE = re.compile(r"(idempotency[-_ ]?key|x-idempotency-key)", re.IGNORECASE)
 REPLAY_MARKER_RE = re.compile(r"(dedup|replay|nonce|sequence|seq_no|event_id|message_id)", re.IGNORECASE)
 BLOCKING_IO_RE = re.compile(r"\b(requests\.(get|post|put|delete)|time\.sleep|subprocess\.)", re.IGNORECASE)
@@ -75,14 +78,14 @@ def run(workspace: Path) -> List[Finding]:
                 }
             )
 
-        if ("matching" in lower_source or "orderbook" in lower_source or "execution" in lower_source) and BLOCKING_IO_RE.search(source):
+        if (
+            "matching" in lower_source or "orderbook" in lower_source or "execution" in lower_source
+        ) and BLOCKING_IO_RE.search(source):
             findings.append(
                 {
                     "severity": "tier2",
                     "rule": "trading-hotpath-blocking-io",
-                    "message": (
-                        f"{file_path}: blocking I/O detected in potential trading hot path."
-                    ),
+                    "message": (f"{file_path}: blocking I/O detected in potential trading hot path."),
                     "confidence": "deterministic",
                     "remediation_owner": "domain-team",
                 }
@@ -166,14 +169,14 @@ def run(workspace: Path) -> List[Finding]:
                     "remediation_owner": "domain-team",
                 }
             )
-        if ("matching" in lower_text or "orderbook" in lower_text or "execution" in lower_text) and BLOCKING_IO_RE.search(text):
+        if (
+            "matching" in lower_text or "orderbook" in lower_text or "execution" in lower_text
+        ) and BLOCKING_IO_RE.search(text):
             findings.append(
                 {
                     "severity": "tier2",
                     "rule": "trading-hotpath-blocking-io",
-                    "message": (
-                        f"{file_path}: blocking I/O detected in potential trading hot path."
-                    ),
+                    "message": (f"{file_path}: blocking I/O detected in potential trading hot path."),
                     "confidence": "deterministic",
                     "remediation_owner": "domain-team",
                 }

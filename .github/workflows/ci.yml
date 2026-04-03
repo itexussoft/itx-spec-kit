@@ -1,3 +1,6 @@
+# CI validates Python tooling: deps from extensions/itx-gates + dev requirements, gitleaks,
+# ruff/mypy on scripts + itx-gates hooks/commands + tests, pip-audit, transitive license policy,
+# unit tests, catalog/manifest consistency, committed pattern-index.md files, release smoke test.
 name: CI
 
 on:
@@ -33,11 +36,11 @@ jobs:
 
       - name: Lint Python (ruff)
         run: |
-          ruff check scripts extensions/itx-gates/hooks tests
+          ruff check scripts extensions/itx-gates/hooks extensions/itx-gates/commands tests
 
       - name: Type check Python (mypy)
         run: |
-          mypy scripts extensions/itx-gates/hooks tests
+          mypy scripts extensions/itx-gates/hooks extensions/itx-gates/commands tests
 
       - name: Dependency audit (pip-audit)
         run: |
@@ -46,7 +49,7 @@ jobs:
 
       - name: License policy check (pip-licenses)
         run: |
-          pip-licenses --allow-only "MIT License;BSD License;Apache Software License;ISC License;Python Software Foundation License"
+          pip-licenses --allow-only "MIT License;MIT;BSD License;BSD-2-Clause;BSD-3-Clause;Apache Software License;Apache-2.0;ISC License;Python Software Foundation License;PSF-2.0;Mozilla Public License 2.0 (MPL 2.0);Apache-2.0 OR BSD-2-Clause"
 
       - name: Python compile checks
         run: |
@@ -57,6 +60,7 @@ jobs:
             extensions/itx-gates/hooks/validators/banking_heuristic.py \
             extensions/itx-gates/hooks/validators/health_regex.py \
             extensions/itx-gates/hooks/validators/saas_platform_heuristic.py \
+            extensions/itx-gates/commands/run_speckit.py \
             scripts/validate_catalog.py \
             scripts/build_catalog_artifacts.py \
             scripts/build_pattern_index.py \
@@ -64,7 +68,6 @@ jobs:
             scripts/itx_init.py \
             scripts/release.py \
             scripts/patch.py \
-            extensions/itx-gates/commands/run_speckit.py \
             tests/test_orchestrator.py \
             tests/test_release.py \
             tests/test_validate_catalog.py \

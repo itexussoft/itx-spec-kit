@@ -4,7 +4,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 RELEASE = ROOT / "scripts" / "release.py"
 
@@ -32,17 +31,11 @@ class ReleaseScriptTests(unittest.TestCase):
                 encoding="utf-8",
             )
             (ws / "presets" / "base" / "preset.yml").write_text(
-                'schema_version: "1.0"\n'
-                "preset:\n"
-                '  id: "base"\n'
-                "  version: \"0.1.0\"\n",
+                'schema_version: "1.0"\npreset:\n  id: "base"\n  version: "0.1.0"\n',
                 encoding="utf-8",
             )
             (ws / "extensions" / "itx-gates" / "extension.yml").write_text(
-                'schema_version: "1.0"\n'
-                "extension:\n"
-                '  id: "itx-gates"\n'
-                "  version: \"0.1.0\"\n",
+                'schema_version: "1.0"\nextension:\n  id: "itx-gates"\n  version: "0.1.0"\n',
                 encoding="utf-8",
             )
             (ws / "scripts" / "validate_catalog.py").write_text(

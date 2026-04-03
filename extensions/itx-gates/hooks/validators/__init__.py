@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterable, List, Literal, NotRequired, Set, TypedDict
+from typing import Iterable, List, Literal, Set, TypedDict
+
+from typing_extensions import NotRequired
 
 
 class Finding(TypedDict):

@@ -1,5 +1,5 @@
-import json
 import importlib.util
+import json
 import subprocess
 import sys
 import tempfile
@@ -8,7 +8,6 @@ from pathlib import Path
 from unittest import mock
 
 import yaml
-
 
 ROOT = Path(__file__).resolve().parents[1]
 ORCH = ROOT / "extensions" / "itx-gates" / "hooks" / "orchestrator.py"

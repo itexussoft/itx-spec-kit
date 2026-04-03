@@ -1,9 +1,8 @@
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
-
-import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -60,7 +59,10 @@ class ItxInitTests(unittest.TestCase):
                     workspace=workspace,
                 )
 
-            self.assertEqual(run_checked.call_args_list[0].args[0], ["git", "clone", "https://github.com/owner/repo.git", str(local_dir)])
+            self.assertEqual(
+                run_checked.call_args_list[0].args[0],
+                ["git", "clone", "https://github.com/owner/repo.git", str(local_dir)],
+            )
             self.assertEqual(run_checked.call_args_list[1].args[0], ["git", "checkout", "v1.2.3"])
             run_specify.assert_called_once()
 

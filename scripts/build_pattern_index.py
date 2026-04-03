@@ -8,7 +8,6 @@ from typing import Iterable
 
 import yaml
 
-
 ROOT = Path(__file__).resolve().parents[1]
 PRESETS_DIR = ROOT / "presets"
 

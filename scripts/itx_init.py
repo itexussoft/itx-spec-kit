@@ -15,9 +15,7 @@ import tempfile
 from pathlib import Path
 
 import yaml
-
 from build_knowledge_manifest import build_manifest
-
 
 ALLOWED_AGENTS = {"cursor", "claude", "copilot", "gemini", "codex"}
 ALLOWED_DOMAINS = {"base", "fintech-trading", "fintech-banking", "healthcare", "saas-platform"}
@@ -411,7 +409,16 @@ def main(argv: list[str] | None = None) -> int:
         except subprocess.CalledProcessError:
             pass
         run_checked(
-            ["spec-kit", "preset", "install", "base", "--source", str(kit_root / "presets" / "base"), "--path", str(workspace)],
+            [
+                "spec-kit",
+                "preset",
+                "install",
+                "base",
+                "--source",
+                str(kit_root / "presets" / "base"),
+                "--path",
+                str(workspace),
+            ],
             quiet=args.quiet,
         )
         if args.domain != "base":
@@ -555,7 +562,9 @@ def main(argv: list[str] | None = None) -> int:
                 )
 
     log("Writing .itx-config.yml...")
-    write_itx_config(workspace, args.domain, args.execution_mode, args.knowledge_mode, container_name, args.spec_kit_ref)
+    write_itx_config(
+        workspace, args.domain, args.execution_mode, args.knowledge_mode, container_name, args.spec_kit_ref
+    )
     stage_docs_and_policy(kit_root, workspace, args.domain)
     stage_templates(kit_root, workspace)
     stage_cursor_rules(kit_root, workspace)

@@ -13,7 +13,6 @@ from typing import List
 
 from validators import Finding, collect_code_files
 
-
 TEST_FILE_RE = re.compile(r"(^test_.*\.py$|.*_test\.py$|.*\.spec\.(ts|js)$|.*\.test\.(ts|js)$)")
 PAYMENT_KEYWORD_RE = re.compile(
     r"\b(payment\w*|transfer\w*|payout\w*|iban|card)\b",
@@ -84,7 +83,9 @@ def run(workspace: Path) -> List[Finding]:
 
         looks_like_payment_flow = bool(PAYMENT_KEYWORD_RE.search(text) and FLOW_SIGNAL_RE.search(text))
         payment_entrypoint = bool(PAYMENT_ENTRYPOINT_RE.search(text))
-        has_sca = any(marker in text_lower for marker in ("sca", "strong customer authentication", "step-up", "2fa", "mfa"))
+        has_sca = any(
+            marker in text_lower for marker in ("sca", "strong customer authentication", "step-up", "2fa", "mfa")
+        )
         has_authz = any(
             marker in text_lower
             for marker in (
@@ -104,9 +105,7 @@ def run(workspace: Path) -> List[Finding]:
                 {
                     "severity": "tier2",
                     "rule": "banking-idempotency-key-missing",
-                    "message": (
-                        f"{file_path}: payment entrypoint appears to be missing idempotency-key handling."
-                    ),
+                    "message": (f"{file_path}: payment entrypoint appears to be missing idempotency-key handling."),
                     "confidence": "deterministic",
                     "remediation_owner": "domain-team",
                 }

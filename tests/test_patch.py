@@ -1,8 +1,7 @@
+import sys
 import tempfile
 import unittest
 from pathlib import Path
-
-import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -253,13 +252,13 @@ class PatchTests(unittest.TestCase):
 
 
 class RunSpeckitTests(unittest.TestCase):
-
     @classmethod
     def setUpClass(cls):
         sys.path.insert(0, str(ROOT / "extensions" / "itx-gates" / "commands"))
 
     def _import(self):
         import run_speckit  # noqa: E402
+
         return run_speckit
 
     def test_run_speckit_cli_detection_returns_none_when_nothing(self):
@@ -272,12 +271,11 @@ class RunSpeckitTests(unittest.TestCase):
     def test_run_speckit_cli_detection_skips_stock_specify(self):
         """specify is skipped when it cannot dispatch extension commands."""
         run_speckit = self._import()
-        from unittest.mock import patch as mock_patch, MagicMock
+        from unittest.mock import MagicMock
+        from unittest.mock import patch as mock_patch
 
         def fake_which(cmd):
-            return "/usr/bin/specify" if cmd == "specify" else (
-                "/usr/bin/uvx" if cmd == "uvx" else None
-            )
+            return "/usr/bin/specify" if cmd == "specify" else ("/usr/bin/uvx" if cmd == "uvx" else None)
 
         fake_probe = MagicMock(return_value=MagicMock(returncode=2))
 
@@ -293,7 +291,8 @@ class RunSpeckitTests(unittest.TestCase):
     def test_run_speckit_cli_detection_uses_specify_when_extensions_ok(self):
         """specify is used when extension list succeeds."""
         run_speckit = self._import()
-        from unittest.mock import patch as mock_patch, MagicMock
+        from unittest.mock import MagicMock
+        from unittest.mock import patch as mock_patch
 
         def fake_which(cmd):
             return "/usr/bin/specify" if cmd == "specify" else None
@@ -366,6 +365,7 @@ class RunSpeckitTests(unittest.TestCase):
     def _make_extension_workspace(self, tmp: str) -> Path:
         """Create a minimal workspace with a registered cleanup extension."""
         import json as _json
+
         ws = Path(tmp) / "project"
         ws.mkdir()
         ext = ws / ".specify" / "extensions" / "cleanup"
@@ -390,9 +390,7 @@ class RunSpeckitTests(unittest.TestCase):
                 "cleanup": {
                     "version": "1.0.0",
                     "enabled": True,
-                    "registered_commands": {
-                        "cursor": ["speckit.cleanup.run", "speckit.cleanup"]
-                    },
+                    "registered_commands": {"cursor": ["speckit.cleanup.run", "speckit.cleanup"]},
                 }
             },
         }
@@ -439,6 +437,7 @@ class RunSpeckitTests(unittest.TestCase):
 
     def test_resolve_local_skips_disabled_extension(self):
         import json as _json
+
         run_speckit = self._import()
         with tempfile.TemporaryDirectory() as tmp:
             ws = self._make_extension_workspace(tmp)
@@ -457,8 +456,8 @@ class RunSpeckitTests(unittest.TestCase):
     def test_main_falls_back_to_local_when_no_cli(self):
         """main() resolves locally and prints prompt envelope when no CLI exists."""
         run_speckit = self._import()
-        from unittest.mock import patch as mock_patch
         import io
+        from unittest.mock import patch as mock_patch
 
         with tempfile.TemporaryDirectory() as tmp:
             ws = self._make_extension_workspace(tmp)
@@ -467,10 +466,14 @@ class RunSpeckitTests(unittest.TestCase):
                 mock_patch("run_speckit.shutil.which", return_value=None),
                 mock_patch("sys.stdout", captured),
             ):
-                rc = run_speckit.main([
-                    "--command", "cleanup.run",
-                    "--workspace", str(ws),
-                ])
+                rc = run_speckit.main(
+                    [
+                        "--command",
+                        "cleanup.run",
+                        "--workspace",
+                        str(ws),
+                    ]
+                )
             self.assertEqual(rc, 0)
             output = captured.getvalue()
             self.assertIn(run_speckit.PROMPT_BEGIN, output)
@@ -484,10 +487,14 @@ class RunSpeckitTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             ws = Path(tmp)
             with mock_patch("run_speckit.shutil.which", return_value=None):
-                rc = run_speckit.main([
-                    "--command", "cleanup.run",
-                    "--workspace", str(ws),
-                ])
+                rc = run_speckit.main(
+                    [
+                        "--command",
+                        "cleanup.run",
+                        "--workspace",
+                        str(ws),
+                    ]
+                )
             self.assertEqual(rc, 1)
 
 

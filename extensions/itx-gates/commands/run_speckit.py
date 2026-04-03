@@ -66,6 +66,7 @@ def _load_spec_kit_ref(workspace: Path) -> str:
 # Local extension resolution
 # ---------------------------------------------------------------------------
 
+
 def _canonicalize(command: str) -> str:
     """Normalise a command name so lookup works with or without ``speckit.`` prefix."""
     if command.startswith("speckit."):
@@ -134,6 +135,7 @@ def _resolve_local(workspace: Path, command: str) -> Path | None:
 # CLI detection
 # ---------------------------------------------------------------------------
 
+
 def _specify_supports_extensions() -> bool:
     """Return True if the ``specify`` on PATH can manage extensions."""
     try:
@@ -186,9 +188,7 @@ def _detect_cli(cli_override: str | None = None) -> str | None:
         if not shutil.which(cmd):
             continue
         if cmd == "specify" and not _specify_supports_extensions():
-            sys.stderr.write(
-                "[run-speckit] specify found but does not support extensions — skipping\n"
-            )
+            sys.stderr.write("[run-speckit] specify found but does not support extensions — skipping\n")
             continue
         return cmd
     return None
@@ -213,6 +213,7 @@ def _build_command(cli: str, speckit_command: str, workspace: Path, spec_kit_ref
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
@@ -250,10 +251,7 @@ def main(argv: list[str] | None = None) -> int:
         canonical = _canonicalize(args.command)
         if canonical.startswith("speckit.") and cli in {"specify", "uvx"}:
             if not _specify_can_dispatch_extension_commands():
-                sys.stderr.write(
-                    f"[run-speckit] {cli} cannot dispatch extension commands — "
-                    "using local resolution\n"
-                )
+                sys.stderr.write(f"[run-speckit] {cli} cannot dispatch extension commands — using local resolution\n")
                 cli = None
 
     if cli is not None:
@@ -268,9 +266,7 @@ def main(argv: list[str] | None = None) -> int:
         if cli_exit == 0:
             return 0
 
-        sys.stderr.write(
-            f"[run-speckit] CLI exited {cli_exit} — trying local resolution\n"
-        )
+        sys.stderr.write(f"[run-speckit] CLI exited {cli_exit} — trying local resolution\n")
 
     # --- Fallback: resolve the extension prompt locally ---
     prompt_path = _resolve_local(workspace, args.command)

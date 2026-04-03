@@ -10,7 +10,6 @@ from typing import Optional
 
 import yaml
 
-
 ROOT = Path(__file__).resolve().parents[1]
 CATALOG = ROOT / "catalog" / "index.json"
 

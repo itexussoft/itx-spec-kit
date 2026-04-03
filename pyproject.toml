@@ -5,6 +5,7 @@ description = "Itexus accelerator for spec-driven AI delivery on top of github/s
 requires-python = ">=3.10"
 dependencies = [
   "PyYAML==6.0.2",
+  "typing_extensions==4.15.0",
 ]
 
 [project.optional-dependencies]
@@ -12,10 +13,11 @@ dev = [
   "ruff==0.12.7",
   "mypy==1.17.1",
   "pip-audit==2.9.0",
+  "types-PyYAML==6.0.12.20250402",
 ]
 
 [tool.ruff]
-line-length = 120
+line-length = 150
 target-version = "py310"
 exclude = [
   "dist",

@@ -36,10 +36,7 @@ class SaasPlatformValidatorTests(unittest.TestCase):
             pkg = ws / "svc"
             pkg.mkdir()
             (pkg / "repo.py").write_text(
-                'tenant_id = "required"\n'
-                'SQL = """\n'
-                "SELECT id, email FROM users WHERE active = 1\n"
-                '"""\n',
+                'tenant_id = "required"\nSQL = """\nSELECT id, email FROM users WHERE active = 1\n"""\n',
                 encoding="utf-8",
             )
             findings = saas_platform_heuristic.run(ws)
@@ -52,8 +49,7 @@ class SaasPlatformValidatorTests(unittest.TestCase):
             pkg = ws / "svc"
             pkg.mkdir()
             (pkg / "cache_layer.py").write_text(
-                "tenant_id = 1\n"
-                'cache.get("global_config")\n',
+                'tenant_id = 1\ncache.get("global_config")\n',
                 encoding="utf-8",
             )
             findings = saas_platform_heuristic.run(ws)
@@ -66,8 +62,7 @@ class SaasPlatformValidatorTests(unittest.TestCase):
             pkg = ws / "svc"
             pkg.mkdir()
             (pkg / "cache_layer.py").write_text(
-                "tenant_id = 1\n"
-                'redis.set("tenant:9:config", "x")\n',
+                'tenant_id = 1\nredis.set("tenant:9:config", "x")\n',
                 encoding="utf-8",
             )
             findings = saas_platform_heuristic.run(ws)

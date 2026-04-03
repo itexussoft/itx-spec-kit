@@ -12,16 +12,15 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Literal, Mapping, Sequence, cast
 
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from validators import Finding, should_skip_path
 
-
-TIER_1 = "tier1"
-TIER_2 = "tier2"
+TIER_1: Literal["tier1"] = "tier1"
+TIER_2: Literal["tier2"] = "tier2"
 RETRY_STATE_PREFIX = "- Retry-State: `"
 
 
@@ -175,22 +174,16 @@ def load_policy(workspace: Path) -> Dict[str, Any]:
     """Load policy.yml from the workspace, warning when fallback is used."""
     policy_path = workspace / ".specify" / "policy.yml"
     if not policy_path.exists():
-        sys.stderr.write(
-            f"[itx-gates] Warning: missing policy file at {policy_path}; using built-in defaults.\n"
-        )
+        sys.stderr.write(f"[itx-gates] Warning: missing policy file at {policy_path}; using built-in defaults.\n")
         return dict(_DEFAULT_POLICY)
     try:
         data = yaml.safe_load(policy_path.read_text(encoding="utf-8"))
     except (yaml.YAMLError, OSError) as exc:
-        sys.stderr.write(
-            f"[itx-gates] Warning: failed to parse policy file at {policy_path}: {exc}; using built-in defaults.\n"
-        )
+        sys.stderr.write(f"[itx-gates] Warning: failed to parse policy file at {policy_path}: {exc}; using built-in defaults.\n")
         return dict(_DEFAULT_POLICY)
     if isinstance(data, dict):
         return data
-    sys.stderr.write(
-        f"[itx-gates] Warning: policy file at {policy_path} is not a mapping; using built-in defaults.\n"
-    )
+    sys.stderr.write(f"[itx-gates] Warning: policy file at {policy_path} is not a mapping; using built-in defaults.\n")
     return dict(_DEFAULT_POLICY)
 
 
@@ -212,14 +205,10 @@ def _parse_retry_limit(raw_value: Any, default: int) -> int:
     try:
         parsed = int(raw_value)
     except (TypeError, ValueError):
-        sys.stderr.write(
-            f"[itx-gates] Warning: invalid gate.max_tier1_retries value '{raw_value}'; using default {default}.\n"
-        )
+        sys.stderr.write(f"[itx-gates] Warning: invalid gate.max_tier1_retries value '{raw_value}'; using default {default}.\n")
         return default
     if parsed < 0:
-        sys.stderr.write(
-            f"[itx-gates] Warning: negative gate.max_tier1_retries value '{raw_value}'; using default {default}.\n"
-        )
+        sys.stderr.write(f"[itx-gates] Warning: negative gate.max_tier1_retries value '{raw_value}'; using default {default}.\n")
         return default
     return parsed
 
@@ -303,21 +292,9 @@ def write_gate_feedback(
                 f"- Rule: `{item.get('rule', 'unspecified')}`",
                 f"- Retry: `{retry_count} / {retry_limit}`",
                 f"- Message: {item.get('message', 'No details provided.')}",
-                (
-                    f"- Confidence: `{item.get('confidence')}`"
-                    if item.get("confidence")
-                    else ""
-                ),
-                (
-                    f"- Remediation: {item.get('remediation')}"
-                    if item.get("remediation")
-                    else ""
-                ),
-                (
-                    f"- Remediation Owner: `{item.get('remediation_owner')}`"
-                    if item.get("remediation_owner")
-                    else ""
-                ),
+                (f"- Confidence: `{item.get('confidence')}`" if item.get("confidence") else ""),
+                (f"- Remediation: {item.get('remediation')}" if item.get("remediation") else ""),
+                (f"- Remediation Owner: `{item.get('remediation_owner')}`" if item.get("remediation_owner") else ""),
                 "",
             ]
         )
@@ -632,10 +609,7 @@ def check_e2e_test_presence(workspace: Path) -> List[Finding]:
                 {
                     "severity": TIER_1,
                     "rule": "e2e-test-placeholder",
-                    "message": (
-                        f"{test_file}: E2E test appears to contain placeholder content "
-                        "(TODO/TBD/FIXME or pass body)."
-                    ),
+                    "message": (f"{test_file}: E2E test appears to contain placeholder content (TODO/TBD/FIXME or pass body)."),
                 }
             )
 
@@ -696,18 +670,10 @@ def _validate_plan_content(plan_path: Path, policy: Dict[str, Any]) -> List[Find
             continue
 
         content_lines = [
-            line
-            for line in section_body.splitlines()
-            if line.strip()
-            and not line.strip().startswith("|--")
-            and not line.strip().startswith("> ")
+            line for line in section_body.splitlines() if line.strip() and not line.strip().startswith("|--") and not line.strip().startswith("> ")
         ]
 
-        real_content = [
-            line
-            for line in content_lines
-            if not any(marker in line for marker in placeholder_markers)
-        ]
+        real_content = [line for line in content_lines if not any(marker in line for marker in placeholder_markers)]
 
         if not real_content:
             findings.append(
@@ -721,9 +687,7 @@ def _validate_plan_content(plan_path: Path, policy: Dict[str, Any]) -> List[Find
     return findings
 
 
-def _extract_selected_patterns(
-    plan_text: str, known_filenames: set[str] | None = None
-) -> tuple[set[str] | None, bool]:
+def _extract_selected_patterns(plan_text: str, known_filenames: set[str] | None = None) -> tuple[set[str] | None, bool]:
     """Extract pattern filenames from a structured selection block, or fall
     back to regex scanning for backward compatibility.
 
@@ -743,11 +707,7 @@ def _extract_selected_patterns(
         raw = match.group(1).strip()
         if raw.lower() == "none":
             return set(), False
-        names = {
-            name.strip().lower()
-            for name in raw.split(",")
-            if name.strip()
-        }
+        names = {name.strip().lower() for name in raw.split(",") if name.strip()}
         return names, False
 
     found = {name.lower() for name in PATTERN_FILENAME_RE.findall(plan_text)}
@@ -772,9 +732,7 @@ def _sync_lazy_knowledge(
     manifest = load_knowledge_manifest(workspace)
     raw_manifest_files = manifest.get("files")
     if raw_manifest_files is not None and not isinstance(raw_manifest_files, dict):
-        sys.stderr.write(
-            "[itx-gates] Warning: malformed knowledge-manifest.json: 'files' must be a mapping; ignoring.\n"
-        )
+        sys.stderr.write("[itx-gates] Warning: malformed knowledge-manifest.json: 'files' must be a mapping; ignoring.\n")
         manifest_files: Dict[str, Dict[str, Any]] = {}
     else:
         manifest_files = raw_manifest_files or {}
@@ -828,16 +786,12 @@ def _sync_lazy_knowledge(
 
     for name_key, entry in manifest_files.items():
         if not isinstance(name_key, str) or not isinstance(entry, dict):
-            sys.stderr.write(
-                "[itx-gates] Warning: malformed knowledge-manifest.json entry ignored.\n"
-            )
+            sys.stderr.write("[itx-gates] Warning: malformed knowledge-manifest.json entry ignored.\n")
             continue
         source_raw = entry.get("source", "")
         category = str(entry.get("category", "")).strip()
         if not isinstance(source_raw, str):
-            sys.stderr.write(
-                f"[itx-gates] Warning: malformed manifest source for '{name_key}' ignored.\n"
-            )
+            sys.stderr.write(f"[itx-gates] Warning: malformed manifest source for '{name_key}' ignored.\n")
             continue
         source = Path(source_raw)
         if source.exists() and category in target_roots:
@@ -859,10 +813,7 @@ def _sync_lazy_knowledge(
             {
                 "severity": TIER_1,
                 "rule": "knowledge-pattern-unresolved",
-                "message": (
-                    "Some plan-selected patterns could not be resolved: "
-                    + ", ".join(unresolved)
-                ),
+                "message": ("Some plan-selected patterns could not be resolved: " + ", ".join(unresolved)),
             }
         )
 
@@ -885,9 +836,7 @@ def _sync_lazy_knowledge(
         promoted.append(name)
 
     if promoted:
-        sys.stdout.write(
-            f"[itx-gates] Lazy knowledge: promoted {len(promoted)} pattern(s): {', '.join(promoted)}\n"
-        )
+        sys.stdout.write(f"[itx-gates] Lazy knowledge: promoted {len(promoted)} pattern(s): {', '.join(promoted)}\n")
     if used_regex_fallback:
         sys.stderr.write(
             "[itx-gates] Warning: detected deprecated inline markdown filename fallback for pattern "
@@ -912,8 +861,7 @@ def run_generic_checks(
                     "severity": TIER_1,
                     "rule": "plan-presence",
                     "message": (
-                        "No plan file found after plan generation stage. Use either "
-                        "system-design-plan-template.md or patch-plan-template.md."
+                        "No plan file found after plan generation stage. Use either system-design-plan-template.md or patch-plan-template.md."
                     ),
                 }
             )
@@ -928,10 +876,7 @@ def run_generic_checks(
                 {
                     "severity": TIER_1,
                     "rule": "tasks-presence",
-                    "message": (
-                        "No tasks file found after task generation stage. "
-                        "Expected tasks.md under specs/** or legacy fallback locations."
-                    ),
+                    "message": ("No tasks file found after task generation stage. Expected tasks.md under specs/** or legacy fallback locations."),
                 }
             )
         else:
@@ -951,10 +896,7 @@ def run_generic_checks(
                 {
                     "severity": TIER_1,
                     "rule": "completion-tasks-unchecked",
-                    "message": (
-                        f"Found {unchecked_count} unchecked task checkbox item(s). "
-                        "All tasks must be completed before delivery."
-                    ),
+                    "message": (f"Found {unchecked_count} unchecked task checkbox item(s). All tasks must be completed before delivery."),
                 }
             )
 
@@ -989,8 +931,7 @@ def run_generic_checks(
                     {
                         "severity": TIER_2,
                         "rule": "docker-exec-failed",
-                        "message": result.stderr.strip()
-                        or "Failed to execute required command via docker exec",
+                        "message": result.stderr.strip() or "Failed to execute required command via docker exec",
                     }
                 )
     return findings
@@ -1007,16 +948,15 @@ def _normalize_finding(raw: Dict[str, Any], rule_defaults: Dict[str, Any] | None
         severity = str(defaults.get("severity", "")).strip()
     if severity not in {TIER_1, TIER_2}:
         return None
-    finding: Finding = {"severity": severity, "rule": rule, "message": message}
+    tier_severity = cast(Literal["tier1", "tier2"], severity)
+    finding: Finding = {"severity": tier_severity, "rule": rule, "message": message}
     confidence = str(raw.get("confidence", "")).strip().lower()
     remediation_owner = str(raw.get("remediation_owner", "")).strip()
     default_meta = {**RULE_DEFAULT_META.get(rule, {}), **defaults}
     if confidence in {"deterministic", "heuristic"}:
         finding["confidence"] = confidence
     elif confidence:
-        sys.stderr.write(
-            f"[itx-gates] Warning: invalid confidence '{confidence}' for rule '{rule}', dropping confidence metadata.\n"
-        )
+        sys.stderr.write(f"[itx-gates] Warning: invalid confidence '{confidence}' for rule '{rule}', dropping confidence metadata.\n")
     elif default_meta.get("confidence"):
         default_confidence = str(default_meta["confidence"]).strip().lower()
         if default_confidence in {"deterministic", "heuristic"}:
@@ -1035,7 +975,7 @@ def _normalize_finding(raw: Dict[str, Any], rule_defaults: Dict[str, Any] | None
     return finding
 
 
-def validate_findings(raw_findings: List[Dict[str, Any]], rule_defaults: Dict[str, Any] | None = None) -> List[Finding]:
+def validate_findings(raw_findings: Sequence[Mapping[str, Any]], rule_defaults: Dict[str, Any] | None = None) -> List[Finding]:
     validated: List[Finding] = []
     for item in raw_findings:
         if not isinstance(item, dict):
@@ -1113,9 +1053,7 @@ def main() -> int:
     tier1 = [f for f in findings if f.get("severity") == TIER_1]
 
     gate_cfg = policy.get("gate") or {}
-    default_retry_limit = _parse_retry_limit(
-        gate_cfg.get("default_max_tier1_retries", 3), 3
-    )
+    default_retry_limit = _parse_retry_limit(gate_cfg.get("default_max_tier1_retries", 3), 3)
     configured_retry_limit = (config.get("gate") or {}).get(
         "max_tier1_retries",
         default_retry_limit,
@@ -1141,10 +1079,7 @@ def main() -> int:
                     {
                         "severity": TIER_2,
                         "rule": f"{finding.get('rule', 'tier1-finding')}-retry-exceeded",
-                        "message": (
-                            f"{finding.get('message', 'Tier 1 finding retried too many times.')} "
-                            f"(retry {retry_count}/{tier1_retry_limit})"
-                        ),
+                        "message": (f"{finding.get('message', 'Tier 1 finding retried too many times.')} (retry {retry_count}/{tier1_retry_limit})"),
                     }
                 )
             else:

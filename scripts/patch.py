@@ -188,7 +188,7 @@ def _ensure_spec_kit_ref(workspace: Path) -> None:
     text = config_path.read_text(encoding="utf-8")
     if "spec_kit_ref:" in text:
         return
-    from importlib.util import spec_from_file_location, module_from_spec
+    from importlib.util import module_from_spec, spec_from_file_location
 
     default_ref = "v0.5.0"
     init_path = Path(__file__).resolve().parent / "itx_init.py"
@@ -292,9 +292,7 @@ def main(argv: list[str] | None = None) -> int:
         sys.stderr.write(f"[itx-patch] Workspace not found: {workspace}\n")
         return 1
     if not (workspace / ".itx-config.yml").exists():
-        sys.stderr.write(
-            f"[itx-patch] Not an itexus-spec-kit workspace (missing .itx-config.yml): {workspace}\n"
-        )
+        sys.stderr.write(f"[itx-patch] Not an itexus-spec-kit workspace (missing .itx-config.yml): {workspace}\n")
         return 1
 
     log(f"Patching workspace: {workspace}")

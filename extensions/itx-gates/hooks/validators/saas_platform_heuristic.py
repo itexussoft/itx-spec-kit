@@ -66,7 +66,7 @@ def _cache_key_has_tenant_token(key: str) -> bool:
             "t:",
             "{tenant",
             "${tenant",
-            "f\"t:",
+            'f"t:',
             "f't:",
         )
     )
