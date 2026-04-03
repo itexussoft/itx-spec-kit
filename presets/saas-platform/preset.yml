@@ -13,6 +13,12 @@ requires:
   speckit_version: ">=0.5.0"
 
 provides:
+  templates:
+    - type: "template"
+      name: "saas-platform-domain-brief"
+      file: "templates/domain-delivery-brief.md"
+      description: "Structured SaaS platform context for specs and plans (tenancy, identity, isolation)"
+
   patterns:
     - type: "pattern"
       name: "multi-tenant-data-isolation"

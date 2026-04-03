@@ -41,11 +41,30 @@ def main() -> int:
         if not preset_yml.exists():
             errors.append(f"Missing preset descriptor: {preset_yml}")
             continue
-        nested = nested_version_of(preset_yml, "preset")
+        try:
+            doc = yaml.safe_load(preset_yml.read_text(encoding="utf-8")) or {}
+        except yaml.YAMLError as exc:
+            errors.append(f"Invalid YAML in {preset_yml}: {exc}")
+            continue
+        if not isinstance(doc, dict):
+            errors.append(f"Preset document must be a mapping: {preset_yml}")
+            continue
+        preset_root = doc.get("preset")
+        if not isinstance(preset_root, dict):
+            errors.append(f"Missing preset.preset mapping: {preset_yml}")
+            continue
+        nested = str(preset_root.get("version", "")).strip() or None
         if nested != kit_version:
             errors.append(
                 f"Version mismatch for preset '{preset['name']}': "
                 f"preset.yml preset.version={nested!r} catalog={kit_version!r}"
+            )
+        provides = doc.get("provides")
+        templates = provides.get("templates") if isinstance(provides, dict) else None
+        if not isinstance(templates, list) or len(templates) < 1:
+            errors.append(
+                f"Preset '{preset['name']}' must declare provides.templates with at least one entry "
+                f"(specify-cli 0.5+): {preset_yml}"
             )
 
     for extension in data["artifacts"]["extensions"]:

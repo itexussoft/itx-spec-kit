@@ -13,6 +13,12 @@ requires:
   speckit_version: ">=0.5.0"
 
 provides:
+  templates:
+    - type: "template"
+      name: "fintech-trading-domain-brief"
+      file: "templates/domain-delivery-brief.md"
+      description: "Structured trading context for specs and plans (latency, market data, risk)"
+
   patterns:
     - type: "pattern"
       name: "cqrs-order-sequencing"

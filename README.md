@@ -44,10 +44,10 @@ Itexus accelerator for spec-driven AI delivery on top of `github/spec-kit`.
 - Cross-platform bootstrap scripts: `init-scripts/itx-init.sh`, `init-scripts/itx-init.ps1`
 - Base and domain presets:
   - `presets/base` — constitution, shared policy, governance YAML (`decision-authority.yml`, `input-contracts.yml`, `notification-events.yml`, `workflow-state-schema.yml`), templates, knowledge-base docs, and foundational architectural patterns
-  - `presets/fintech-trading` — trading-specific constitution, constraints, and patterns (CQRS, cell-based HA)
-  - `presets/fintech-banking` — banking-specific constitution, constraints, and patterns (event-sourced ledger, sagas, PSD2 gateway)
-  - `presets/healthcare` — healthcare-specific constitution, constraints, and patterns (FHIR facade, zero-trust PHI)
-  - `presets/saas-platform` — multi-tenant SaaS constitution, constraints, and patterns (data isolation, OIDC/SSO, white-label BFF config)
+  - `presets/fintech-trading` — trading-specific constitution, constraints, and patterns (CQRS, cell-based HA); includes a **domain delivery brief** template so `specify preset add` meets specify-cli 0.5+ requirements
+  - `presets/fintech-banking` — banking-specific constitution, constraints, and patterns (event-sourced ledger, sagas, PSD2 gateway); includes a **domain delivery brief** template for the same reason
+  - `presets/healthcare` — healthcare-specific constitution, constraints, and patterns (FHIR facade, zero-trust PHI); includes a **domain delivery brief** template for the same reason
+  - `presets/saas-platform` — multi-tenant SaaS constitution, constraints, and patterns (data isolation, OIDC/SSO, white-label BFF config); includes a **domain delivery brief** template for the same reason
 - Shared policy manifest: `presets/base/policy.yml` — single source of truth for plan tier rules consumed by the gate orchestrator
 - Active quality-gate extension: `extensions/itx-gates`
 - Community extensions installed by default: `dsrednicki/spec-kit-cleanup`, `ismaelJimenez/spec-kit-review` (optional: `--with-jira` adds `spec-kit-jira`)

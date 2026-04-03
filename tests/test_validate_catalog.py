@@ -21,6 +21,8 @@ class ValidateCatalogTests(unittest.TestCase):
     def make_workspace(self, tmp: Path) -> None:
         (tmp / "catalog").mkdir(parents=True, exist_ok=True)
         (tmp / "presets" / "base").mkdir(parents=True, exist_ok=True)
+        (tmp / "presets" / "base" / "templates").mkdir(parents=True, exist_ok=True)
+        (tmp / "presets" / "base" / "templates" / "stub.md").write_text("# stub\n", encoding="utf-8")
         (tmp / "extensions" / "itx-gates").mkdir(parents=True, exist_ok=True)
         (tmp / "catalog" / "index.json").write_text(
             json.dumps(
@@ -39,7 +41,13 @@ class ValidateCatalogTests(unittest.TestCase):
             'schema_version: "1.0"\n'
             "preset:\n"
             '  id: "base"\n'
-            "  version: \"0.1.0\"\n",
+            "  version: \"0.1.0\"\n"
+            "provides:\n"
+            "  templates:\n"
+            "    - type: \"template\"\n"
+            "      name: \"stub\"\n"
+            "      file: \"templates/stub.md\"\n"
+            "      description: \"catalog test stub\"\n",
             encoding="utf-8",
         )
         (tmp / "extensions" / "itx-gates" / "extension.yml").write_text(
@@ -70,7 +78,13 @@ class ValidateCatalogTests(unittest.TestCase):
                 'schema_version: "1.0"\n'
                 "preset:\n"
                 '  id: "base"\n'
-                "  version: \"0.1.9\"\n",
+                "  version: \"0.1.9\"\n"
+                "provides:\n"
+                "  templates:\n"
+                "    - type: \"template\"\n"
+                "      name: \"stub\"\n"
+                "      file: \"templates/stub.md\"\n"
+                "      description: \"catalog test stub\"\n",
                 encoding="utf-8",
             )
             self.assertEqual(self.run_main_with_workspace(ws), 1)
@@ -80,6 +94,21 @@ class ValidateCatalogTests(unittest.TestCase):
             ws = Path(tmp)
             self.make_workspace(ws)
             (ws / "presets" / "base" / "preset.yml").unlink()
+            self.assertEqual(self.run_main_with_workspace(ws), 1)
+
+    def test_validate_catalog_fails_when_preset_has_no_templates(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            self.make_workspace(ws)
+            (ws / "presets" / "base" / "preset.yml").write_text(
+                'schema_version: "1.0"\n'
+                "preset:\n"
+                '  id: "base"\n'
+                "  version: \"0.1.0\"\n"
+                "provides:\n"
+                "  patterns: []\n",
+                encoding="utf-8",
+            )
             self.assertEqual(self.run_main_with_workspace(ws), 1)
 
     def test_validate_catalog_fails_on_extension_nested_version_mismatch(self):
