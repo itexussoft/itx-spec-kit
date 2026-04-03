@@ -29,6 +29,7 @@ DOMAIN_VALIDATORS: Dict[str, str] = {
     "fintech-trading": "validators.trading_ast",
     "fintech-banking": "validators.banking_heuristic",
     "healthcare": "validators.health_regex",
+    "saas-platform": "validators.saas_platform_heuristic",
 }
 
 # Inline fallback used when policy.yml is not available in the workspace.
@@ -130,6 +131,16 @@ _DEFAULT_POLICY: Dict[str, Any] = {
             "severity": "tier1",
             "confidence": "heuristic",
             "remediation_owner": "security-team",
+        },
+        "saas-tenant-filter-missing": {
+            "severity": "tier1",
+            "confidence": "heuristic",
+            "remediation_owner": "domain-team",
+        },
+        "saas-global-cache-key": {
+            "severity": "tier1",
+            "confidence": "heuristic",
+            "remediation_owner": "domain-team",
         },
         "completion-tasks-unchecked": {
             "severity": "tier1",
@@ -369,6 +380,8 @@ RULE_REMEDIATION_HINTS: Dict[str, str] = {
     "banking-idempotency-key-missing": "Require and persist idempotency keys for payment commands/endpoints.",
     "banking-payment-boundary-controls-missing": "Add explicit SCA and authorization controls at payment entrypoints.",
     "banking-psd2-sca-missing-advisory": "Document or implement SCA controls (middleware/policy/decorator) for payment flows.",
+    "saas-tenant-filter-missing": "Add tenant_id filters or RLS session variables for all tenant-scoped queries.",
+    "saas-global-cache-key": "Namespace cache keys with tenant id (e.g. t:{tenant_id}:...) to prevent cross-tenant leakage.",
 }
 RULE_DEFAULT_META: Dict[str, Dict[str, str]] = {
     "trading-no-float-money": {"confidence": "deterministic", "remediation_owner": "domain-team"},

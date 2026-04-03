@@ -91,6 +91,7 @@ from the constitution or anti-pattern markdown files.
 | `fintech-banking` | Raw PAN storage patterns; advisory warning when payment flow lacks explicit SCA markers | Double-entry correctness, ledger invariants, reconciliation, clock injection |
 | `fintech-trading` | `float` money checks, idempotency-key checks, lifecycle-transition checks, hot-path blocking-I/O checks, replay-marker advisories | Full matching-engine determinism, cross-service sequencing guarantees |
 | `healthcare` | PHI-specific variable names inside logging statements (`patient_name`, `ssn`, `dob`, etc.; opaque IDs like `patient_id` are allowed) | Consent checks, FHIR compliance, retention policies, audit trail completeness |
+| `saas-platform` | Heuristic checks for tenant-scoped SQL without `tenant_id` and cache/redis literal keys that omit tenant namespace | Full RLS correctness, OIDC token validation, cross-tenant integration tests, SCIM |
 
 The markdown patterns, design-patterns, and anti-patterns in `.specify/` guide
 the AI agent's design-time reasoning. The Python gates provide a runtime safety
@@ -106,7 +107,7 @@ This matrix defines how strongly each control is currently enforced:
 | Tasks presence and checkbox syntax | `after_tasks` validator | **enforced** |
 | E2E test file and assertion baseline | `after_implement` generic checks | **enforced** |
 | Completion readiness (all tasks done + no Tier 2 outstanding) | `after_review` generic checks | **enforced** |
-| Domain tripwire checks (trading/banking/healthcare) | Domain validators in `hooks/validators/` | **enforced** |
+| Domain tripwire checks (trading/banking/healthcare/saas-platform) | Domain validators in `hooks/validators/` | **enforced** |
 | Banking payment invariants (`idempotency-key`, in-place ledger mutation) | Banking validator + policy `rules` metadata | **enforced** |
 | Retry and escalation policy | Retry-state logic in `orchestrator.py` | **enforced** |
 | Rule severity/confidence/remediation ownership metadata | `.specify/policy.yml` `rules` map + orchestrator normalization | **enforced** |

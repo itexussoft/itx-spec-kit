@@ -40,6 +40,7 @@ Itexus accelerator for spec-driven AI delivery on top of `github/spec-kit`.
   - `presets/fintech-trading` — trading-specific constitution, constraints, and patterns (CQRS, cell-based HA)
   - `presets/fintech-banking` — banking-specific constitution, constraints, and patterns (event-sourced ledger, sagas, PSD2 gateway)
   - `presets/healthcare` — healthcare-specific constitution, constraints, and patterns (FHIR facade, zero-trust PHI)
+  - `presets/saas-platform` — multi-tenant SaaS constitution, constraints, and patterns (data isolation, OIDC/SSO, white-label BFF config)
 - Shared policy manifest: `presets/base/policy.yml` — single source of truth for plan tier rules consumed by the gate orchestrator
 - Active quality-gate extension: `extensions/itx-gates`
 - Community extensions installed by default: `dsrednicki/spec-kit-cleanup`, `ismaelJimenez/spec-kit-review` (optional: `--with-jira` adds `spec-kit-jira`)
@@ -89,6 +90,8 @@ itexus-spec-kit/
 │   │   └── (same structure as fintech-trading)
 │   └── healthcare/
 │       └── (same structure as fintech-trading)
+│   └── saas-platform/
+│       └── (same structure as fintech-trading)
 ├── scripts/
 └── tests/
 ```
@@ -120,7 +123,7 @@ For backward compatibility the gate also recognizes inline backtick references t
 
 ## Architectural patterns
 
-**Base patterns** (always included): Domain-Driven Design, Hexagonal Architecture, Clean Architecture, Modular Monolith, Event-Driven Microservices, Transactional Outbox, E2E Testing Strategy, CLI Orchestrator Architecture.
+**Base patterns** (always included): Foundational Principles (KISS/YAGNI/DRY/SOLID), Domain-Driven Design, Hexagonal Architecture, Clean Architecture, Modular Monolith, Event-Driven Microservices, Transactional Outbox, E2E Testing Strategy, CLI Orchestrator Architecture, Asynchronous Event Loop Architecture.
 
 For tool-class projects (CLI tools, workflow engines, automation scripts), use
 the **Tool Plan** path from the constitution and prefer
@@ -133,6 +136,7 @@ the **Tool Plan** path from the constitution and prefer
 | `fintech-trading` | CQRS Order Sequencing, High-Availability Cell-Based Architecture |
 | `fintech-banking` | Event-Sourced Ledger, Saga Distributed Transactions, PSD2 API Gateway |
 | `healthcare` | FHIR Facade, Zero-Trust PHI Boundary |
+| `saas-platform` | Multi-Tenant Data Isolation, Federated Identity (OIDC), White-Label Theming Architecture |
 
 ## Prerequisites
 
@@ -297,8 +301,10 @@ truth when assessing delivery assurance.
 | Banking PCI/SCA heuristic tripwires | `validators/banking_heuristic.py` | **enforced** |
 | Banking idempotency-key and in-place ledger mutation checks | `validators/banking_heuristic.py` + policy rule mapping | **enforced** |
 | Healthcare PHI logging heuristic tripwires | `validators/health_regex.py` | **enforced** |
+| SaaS tenant-scoped query / cache key heuristic tripwires | `validators/saas_platform_heuristic.py` | **enforced** |
 | DDD correctness and complete architecture quality | Constitution + pattern guidance | **advisory** |
 | Full compliance proof (PCI/PSD2/HIPAA) | Constitution + domain docs + human review | **advisory** |
+| Full multi-tenant isolation proof (RLS, cross-tenant tests) | Constitution + domain docs + human review | **advisory** |
 | Broader semantic validator coverage and stronger precision | Roadmap Milestone 1 / Milestone 5 | **planned** |
 
 ## Security controls matrix

@@ -21,6 +21,10 @@
       {
         "name": "healthcare",
         "path": "presets/healthcare"
+      },
+      {
+        "name": "saas-platform",
+        "path": "presets/saas-platform"
       }
     ],
     "extensions": [

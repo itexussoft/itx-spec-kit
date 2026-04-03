@@ -88,6 +88,14 @@ rules:
     severity: tier1
     confidence: heuristic
     remediation_owner: security-team
+  saas-tenant-filter-missing:
+    severity: tier1
+    confidence: heuristic
+    remediation_owner: domain-team
+  saas-global-cache-key:
+    severity: tier1
+    confidence: heuristic
+    remediation_owner: domain-team
   completion-tasks-unchecked:
     severity: tier1
     confidence: deterministic

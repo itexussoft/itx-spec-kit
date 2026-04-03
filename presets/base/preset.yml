@@ -52,6 +52,10 @@ provides:
 
   patterns:
     - type: "pattern"
+      name: "foundational-principles"
+      file: "patterns/foundational-principles.md"
+      description: "KISS, YAGNI, DRY, SOLID, and Separation of Concerns as AI-first design principles"
+    - type: "pattern"
       name: "domain-driven-design"
       file: "patterns/domain-driven-design.md"
       description: "Bounded Contexts, Aggregates, Entities, and Value Objects"

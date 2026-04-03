@@ -1,6 +1,7 @@
 # Pattern Index (base)
 
 ## Architectural Patterns
+- `foundational-principles.md`: KISS, YAGNI, DRY, SOLID, and Separation of Concerns as AI-first design principles
 - `domain-driven-design.md`: Bounded Contexts, Aggregates, Entities, and Value Objects
 - `hexagonal-architecture.md`: Ports-and-adapters architecture to isolate domain logic
 - `clean-architecture.md`: Dependency rule and use-case oriented architecture

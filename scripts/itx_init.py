@@ -18,7 +18,7 @@ from build_knowledge_manifest import build_manifest
 
 
 ALLOWED_AGENTS = {"cursor", "claude", "copilot", "gemini", "codex"}
-ALLOWED_DOMAINS = {"base", "fintech-trading", "fintech-banking", "healthcare"}
+ALLOWED_DOMAINS = {"base", "fintech-trading", "fintech-banking", "healthcare", "saas-platform"}
 ALLOWED_KNOWLEDGE_MODES = {"lazy", "eager"}
 ALLOWED_EXECUTION_MODES = {"mcp", "docker-fallback"}
 DEFAULT_SPEC_KIT_REF = "v0.4.3"

@@ -24,6 +24,7 @@ compile:
 		extensions/itx-gates/hooks/validators/trading_ast.py \
 		extensions/itx-gates/hooks/validators/banking_heuristic.py \
 		extensions/itx-gates/hooks/validators/health_regex.py \
+		extensions/itx-gates/hooks/validators/saas_platform_heuristic.py \
 		extensions/itx-gates/commands/run_speckit.py \
 		scripts/validate_catalog.py \
 		scripts/build_catalog_artifacts.py \
@@ -36,7 +37,8 @@ compile:
 		tests/test_release.py \
 		tests/test_validate_catalog.py \
 		tests/test_itx_init.py \
-		tests/test_patch.py
+		tests/test_patch.py \
+		tests/test_saas_validator.py
 
 validate-catalog:
 	$(PYTHON) scripts/validate_catalog.py
