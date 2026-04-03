@@ -190,7 +190,7 @@ def _ensure_spec_kit_ref(workspace: Path) -> None:
         return
     from importlib.util import spec_from_file_location, module_from_spec
 
-    default_ref = "v0.4.3"
+    default_ref = "v0.5.0"
     init_path = Path(__file__).resolve().parent / "itx_init.py"
     if init_path.exists():
         try:

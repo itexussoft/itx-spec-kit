@@ -41,7 +41,7 @@ from pathlib import Path
 
 import yaml
 
-DEFAULT_SPEC_KIT_REF = "v0.4.3"
+DEFAULT_SPEC_KIT_REF = "v0.5.0"
 
 PROMPT_BEGIN = "---SPECKIT-PROMPT---"
 PROMPT_END = "---END-SPECKIT-PROMPT---"

@@ -53,6 +53,7 @@ jobs:
             extensions/itx-gates/hooks/validators/trading_ast.py \
             extensions/itx-gates/hooks/validators/banking_heuristic.py \
             extensions/itx-gates/hooks/validators/health_regex.py \
+            extensions/itx-gates/hooks/validators/saas_platform_heuristic.py \
             scripts/validate_catalog.py \
             scripts/build_catalog_artifacts.py \
             scripts/build_pattern_index.py \
@@ -65,7 +66,8 @@ jobs:
             tests/test_release.py \
             tests/test_validate_catalog.py \
             tests/test_itx_init.py \
-            tests/test_patch.py
+            tests/test_patch.py \
+            tests/test_saas_validator.py
 
       - name: Run unit tests
         run: |
@@ -102,10 +104,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install latest specify-cli from upstream
+      - name: Install specify-cli pinned to default upstream ref
         run: |
           python -m pip install --upgrade pip
-          pip install "specify-cli @ git+https://github.com/github/spec-kit.git@main"
+          pip install "specify-cli @ git+https://github.com/github/spec-kit.git@v0.5.0"
           pip install -r extensions/itx-gates/requirements.txt
 
       - name: Drift checks (CLI flags, layout, bootstrap)
@@ -134,6 +136,7 @@ jobs:
             --project-name "drift-smoke" \
             --agent codex \
             --domain base \
+            --spec-kit-ref v0.5.0 \
             --workspace "${TMP_WORKSPACE}" \
             --execution-mode mcp \
             --quiet

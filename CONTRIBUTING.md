@@ -5,7 +5,7 @@
 - Python 3.x
 - Docker / Docker Compose
 - Spec Kit CLI: `specify` (via [Spec Kit installation](https://github.github.com/spec-kit/installation.html)), `spec-kit`, or `uvx`
-- If `uvx` fallback is used, upstream `github/spec-kit` is pinned to `v0.4.3` by default (override with `--spec-kit-ref`)
+- If `uvx` fallback is used, upstream `github/spec-kit` is pinned to `v0.5.0` by default (override with `--spec-kit-ref`)
 - `make` (POSIX) or PowerShell (Windows)
 
 ## Local development flow

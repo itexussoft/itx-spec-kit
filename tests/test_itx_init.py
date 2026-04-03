@@ -21,6 +21,23 @@ class ItxInitTests(unittest.TestCase):
         url = itx_init._archive_url("owner/repo", "v1.2.3")
         self.assertEqual(url, "https://github.com/owner/repo/archive/v1.2.3.zip")
 
+    def test_strip_legacy_extension_command_aliases_removes_aliases(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ext_dir = Path(tmp) / "ext"
+            ext_dir.mkdir()
+            (ext_dir / "extension.yml").write_text(
+                "schema_version: '1.0'\n"
+                "provides:\n"
+                "  commands:\n"
+                "    - name: speckit.cleanup.run\n"
+                "      file: commands/cleanup.md\n"
+                "      aliases: [speckit.cleanup]\n",
+                encoding="utf-8",
+            )
+            itx_init.strip_legacy_extension_command_aliases(ext_dir)
+            text = (ext_dir / "extension.yml").read_text(encoding="utf-8")
+            self.assertNotIn("aliases", text)
+
     def test_install_extension_from_git_uses_checkout_ref(self):
         with tempfile.TemporaryDirectory() as tmp:
             local_dir = Path(tmp) / "ext"

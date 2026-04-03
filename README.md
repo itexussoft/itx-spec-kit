@@ -2,7 +2,14 @@
 
 Itexus accelerator for spec-driven AI delivery on top of `github/spec-kit`.
 
-**Kit version** is declared in [`catalog/index.json`](catalog/index.json) as `kit.version` (currently **0.2.1**).
+**Kit version** is declared in [`catalog/index.json`](catalog/index.json) as `kit.version` (currently **0.2.2**).
+
+## What changed in 0.2.2
+
+- **Upstream default:** bootstrap and `uvx` flows pin **github/spec-kit `v0.5.0`** (override with `spec_kit_ref` in `.itx-config.yml` or `--spec-kit-ref` on init).
+- **`specify init`:** `itx_init` passes **`--ignore-agent-tools`** so init does not require Codex/Claude/etc. on `PATH`.
+- **Community extensions:** cloned extensions are sanitized to drop legacy command **aliases** that **specify-cli 0.5+** rejects (canonical command names unchanged).
+- **Manifests:** presets and `itx-gates` declare **`speckit_version: ">=0.5.0"`** so older specify-cli installs are rejected at `preset add` / `extension add`.
 
 ## What changed in 0.2.1
 
@@ -143,7 +150,7 @@ the **Tool Plan** path from the constitution and prefer
 - Python 3.x
 - Docker / Docker Compose (required only for `--execution-mode docker-fallback`)
 - Spec Kit CLI: `specify` (install via [Spec Kit installation](https://github.github.com/spec-kit/installation.html)), or `uvx` (init scripts can use `uvx` when `specify` is not on `PATH`)
-- When `uvx` is used, bootstrap pins upstream `github/spec-kit` to `v0.4.3` by default. Override with `--spec-kit-ref <tag-or-sha>` when needed.
+- When `uvx` is used, bootstrap pins upstream `github/spec-kit` to `v0.5.0` by default. Override with `--spec-kit-ref <tag-or-sha>` when needed. Existing workspaces may keep `spec_kit_ref: "v0.4.3"` in `.itx-config.yml` until you intentionally upgrade.
 
 ## Dependency management
 
@@ -181,7 +188,7 @@ After implementation, use your review/cleanup extensions as needed. When the rev
   --project-name "example-service" \
   --agent cursor \
   --domain fintech-trading \
-  --spec-kit-ref v0.4.3 \
+  --spec-kit-ref v0.5.0 \
   --workspace "/path/to/project" \
   --execution-mode docker-fallback \
   --with-jira
@@ -194,7 +201,7 @@ After implementation, use your review/cleanup extensions as needed. When the rev
   --project-name "example-service" `
   --agent cursor `
   --domain fintech-trading `
-  --spec-kit-ref v0.4.3 `
+  --spec-kit-ref v0.5.0 `
   --workspace "C:\work\example-service" `
   --execution-mode docker-fallback `
   --with-jira
@@ -419,6 +426,7 @@ Current focus:
 
 Already shipped baseline:
 
+- **0.2.2** — default **spec-kit `v0.5.0`**, `--ignore-agent-tools` on init, community extension alias sanitization for specify-cli 0.5+, `speckit_version >=0.5.0` on kit artifacts
 - **0.2.1** — `asynchronous-event-loop-architecture.md` pattern for asyncio integration daemons; Tool Plan constitution alignment
 - **0.2.0** — governance YAML in `.specify/`, `after_review` gate, `delivery-mechanics.md`, `done-report-template.md`, init/patch staging for autonomy contracts
 - **0.1.3** — E2E and QA foundation (mandatory test strategy section, E2E gate checks, QA/testing templates)

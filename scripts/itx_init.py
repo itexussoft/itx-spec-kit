@@ -14,6 +14,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+import yaml
+
 from build_knowledge_manifest import build_manifest
 
 
@@ -21,7 +23,7 @@ ALLOWED_AGENTS = {"cursor", "claude", "copilot", "gemini", "codex"}
 ALLOWED_DOMAINS = {"base", "fintech-trading", "fintech-banking", "healthcare", "saas-platform"}
 ALLOWED_KNOWLEDGE_MODES = {"lazy", "eager"}
 ALLOWED_EXECUTION_MODES = {"mcp", "docker-fallback"}
-DEFAULT_SPEC_KIT_REF = "v0.4.3"
+DEFAULT_SPEC_KIT_REF = "v0.5.0"
 EXTENSION_REFS = {
     "dsrednicki/spec-kit-cleanup": "v1.0.0",
     "ismaelJimenez/spec-kit-review": "v1.0.0",
@@ -97,6 +99,40 @@ def require_command(name: str) -> None:
         raise RuntimeError(f"Missing required command: {name}")
 
 
+def strip_legacy_extension_command_aliases(ext_dir: Path) -> None:
+    """Remove command `aliases` entries before `specify extension add`.
+
+    specify-cli 0.5+ rejects short forms like `speckit.cleanup`; canonical names
+    such as `speckit.cleanup.run` remain valid. Community extensions may still
+    ship legacy aliases until upstream tags are updated.
+    """
+    ext_yml = ext_dir / "extension.yml"
+    if not ext_yml.is_file():
+        return
+    try:
+        data = yaml.safe_load(ext_yml.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        return
+    if not isinstance(data, dict):
+        return
+    provides = data.get("provides")
+    if not isinstance(provides, dict):
+        return
+    commands = provides.get("commands")
+    if not isinstance(commands, list):
+        return
+    changed = False
+    for entry in commands:
+        if isinstance(entry, dict) and "aliases" in entry:
+            entry.pop("aliases", None)
+            changed = True
+    if changed:
+        ext_yml.write_text(
+            yaml.dump(data, default_flow_style=False, sort_keys=False, allow_unicode=True),
+            encoding="utf-8",
+        )
+
+
 def install_extension_from_git(
     spec_cli: str,
     repo_url: str,
@@ -113,6 +149,7 @@ def install_extension_from_git(
             log(f"Cloning extension: {repo_url}@{git_ref}")
         run_checked(["git", "clone", repo_url, str(local_dir)], quiet=quiet)
         run_checked(["git", "checkout", git_ref], quiet=quiet, cwd=local_dir)
+        strip_legacy_extension_command_aliases(local_dir)
         if not quiet:
             log(f"Installing extension from dev path: {local_dir}")
         run_specify(spec_cli, ["extension", "add", str(local_dir), "--dev"], spec_kit_ref, quiet=quiet, cwd=workspace)
@@ -336,7 +373,16 @@ def main(argv: list[str] | None = None) -> int:
         try:
             run_specify(
                 spec_cli,
-                ["init", "--here", "--ai", specify_agent, "--script", script_type, "--force"],
+                [
+                    "init",
+                    "--here",
+                    "--ai",
+                    specify_agent,
+                    "--script",
+                    script_type,
+                    "--force",
+                    "--ignore-agent-tools",
+                ],
                 args.spec_kit_ref,
                 quiet=args.quiet,
                 cwd=workspace,
@@ -344,7 +390,15 @@ def main(argv: list[str] | None = None) -> int:
         except subprocess.CalledProcessError:
             run_specify(
                 spec_cli,
-                ["init", "--here", "--ai", specify_agent, "--script", script_type],
+                [
+                    "init",
+                    "--here",
+                    "--ai",
+                    specify_agent,
+                    "--script",
+                    script_type,
+                    "--ignore-agent-tools",
+                ],
                 args.spec_kit_ref,
                 quiet=args.quiet,
                 cwd=workspace,
