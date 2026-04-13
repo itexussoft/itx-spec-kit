@@ -51,6 +51,7 @@ from itx_specify import (
     install_community_extensions,
     load_spec_kit_ref,
     map_agent_for_specify,
+    materialize_extension_skills_for_agent,
     materialize_extension_workflows_for_agent,
     mirror_registry_commands,
     run_specify,
@@ -414,6 +415,10 @@ def post_agent_extension_sync(
     n = materialize_extension_workflows_for_agent(workspace, canonical_agent)
     if n:
         log(f"Materialized {n} extension workflow file(s) for {canonical_agent!r}")
+
+    n = materialize_extension_skills_for_agent(workspace, canonical_agent)
+    if n:
+        log(f"Materialized {n} extension skill file(s) for {canonical_agent!r}")
 
     if mirror_registry_commands(workspace, canonical_agent):
         log(f"Mirrored extension registry command entries for {canonical_agent!r}")

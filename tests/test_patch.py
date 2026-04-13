@@ -329,13 +329,17 @@ class PatchTests(unittest.TestCase):
                         "patch.materialize_extension_workflows_for_agent", return_value=2
                     ) as mat:
                         with mock.patch(
-                            "patch.mirror_registry_commands", return_value=True
-                        ) as mir:
-                            patch_mod.post_agent_extension_sync(
-                                ws, ROOT, "kilocode", skip_extension_sync=False
-                            )
+                            "patch.materialize_extension_skills_for_agent", return_value=1
+                        ) as skills:
+                            with mock.patch(
+                                "patch.mirror_registry_commands", return_value=True
+                            ) as mir:
+                                patch_mod.post_agent_extension_sync(
+                                    ws, ROOT, "kilocode", skip_extension_sync=False
+                                )
             ic.assert_called_once()
             mat.assert_called_once_with(ws, "kilocode")
+            skills.assert_called_once_with(ws, "kilocode")
             mir.assert_called_once_with(ws, "kilocode")
 
     def test_main_retarget_ai_runs_extension_sync(self):
@@ -405,6 +409,49 @@ class PatchTests(unittest.TestCase):
             loaded = json.loads((reg_dir / ".registry").read_text(encoding="utf-8"))
             rc = loaded["extensions"]["review"]["registered_commands"]
             self.assertEqual(rc["kilocode"], ["speckit.review.run"])
+
+    def test_materialize_extension_skills_for_codex(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp) / "w"
+            ws.mkdir()
+            (ws / ".agents" / "skills").mkdir(parents=True)
+            (ws / ".specify" / "scripts" / "bash").mkdir(parents=True)
+            (ws / ".specify" / "scripts" / "bash" / "check-prerequisites.sh").write_text(
+                "#!/bin/sh\n",
+                encoding="utf-8",
+            )
+
+            ext = ws / ".specify" / "extensions" / "cleanup"
+            ext.mkdir(parents=True)
+            (ext / "commands").mkdir()
+            (ext / "commands" / "cleanup.md").write_text(
+                "---\n"
+                'description: "Cleanup command"\n'
+                "scripts:\n"
+                "  sh: scripts/bash/check-prerequisites.sh --json --require-tasks\n"
+                "---\n\n"
+                "Run `{SCRIPT}` now.\n",
+                encoding="utf-8",
+            )
+            (ext / "extension.yml").write_text(
+                'schema_version: "1.0"\n'
+                "extension:\n"
+                '  id: "cleanup"\n'
+                "provides:\n"
+                "  commands:\n"
+                '    - name: "speckit.cleanup.run"\n'
+                '      file: "commands/cleanup.md"\n',
+                encoding="utf-8",
+            )
+
+            n = itx_specify.materialize_extension_skills_for_agent(ws, "codex")
+            self.assertEqual(n, 1)
+            dest = ws / ".agents" / "skills" / "speckit-cleanup-run" / "SKILL.md"
+            text = dest.read_text(encoding="utf-8")
+            self.assertIn('name: speckit-cleanup-run', text)
+            self.assertIn("Cleanup command", text)
+            self.assertIn(".specify/scripts/bash/check-prerequisites.sh --json --require-tasks", text)
+            self.assertEqual(itx_specify.materialize_extension_skills_for_agent(ws, "codex"), 0)
 
 
 class RunSpeckitTests(unittest.TestCase):

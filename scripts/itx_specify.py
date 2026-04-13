@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -465,6 +466,144 @@ def materialize_extension_workflows_for_agent(workspace: Path, canonical_agent: 
                 continue
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dest)
+            created += 1
+    return created
+
+
+_FRONTMATTER_RE = re.compile(r"\A---\n(.*?)\n---\n?", re.DOTALL)
+
+
+def agent_skills_dir(workspace: Path, canonical_agent: str) -> Path | None:
+    """Return a skill directory for agents that expose skill folders."""
+    if canonical_agent == "generic":
+        return None
+    folder = agent_artifact_folder(canonical_agent)
+    if not folder:
+        return None
+    rel = folder.rstrip("/")
+    candidate = workspace / rel / "skills"
+    if candidate.is_dir():
+        return candidate
+    if canonical_agent in {"claude", "codex"}:
+        return candidate
+    return None
+
+
+def _split_script_command(command: str) -> tuple[str, str]:
+    text = str(command).strip()
+    if not text:
+        return "", ""
+    parts = text.split(maxsplit=1)
+    if len(parts) == 1:
+        return parts[0], ""
+    return parts[0], " " + parts[1]
+
+
+def _resolve_skill_script_reference(workspace: Path, ext_dir: Path, ext_id: str, raw: str) -> str:
+    script_rel, suffix = _split_script_command(raw)
+    if not script_rel:
+        return raw
+    ext_script = ext_dir / script_rel
+    if ext_script.exists():
+        return f".specify/extensions/{ext_id}/{script_rel}{suffix}"
+    shared_script = workspace / ".specify" / script_rel
+    if shared_script.exists():
+        return f".specify/{script_rel}{suffix}"
+    return raw
+
+
+def _load_command_frontmatter(markdown: str) -> tuple[dict[str, Any], str]:
+    match = _FRONTMATTER_RE.match(markdown)
+    if not match:
+        return {}, markdown
+    try:
+        data = yaml.safe_load(match.group(1)) or {}
+    except yaml.YAMLError:
+        data = {}
+    body = markdown[match.end() :]
+    return data if isinstance(data, dict) else {}, body
+
+
+def materialize_extension_skills_for_agent(workspace: Path, canonical_agent: str) -> int:
+    """Create agent skill files from installed extension commands when missing."""
+    skills_dir = agent_skills_dir(workspace, canonical_agent)
+    if skills_dir is None:
+        return 0
+
+    ext_root = workspace / ".specify" / "extensions"
+    if not ext_root.is_dir():
+        return 0
+
+    created = 0
+    for ext_dir in sorted(ext_root.iterdir()):
+        if not ext_dir.is_dir() or ext_dir.name.startswith("."):
+            continue
+        ext_yml = ext_dir / "extension.yml"
+        if not ext_yml.is_file():
+            continue
+        try:
+            data = yaml.safe_load(ext_yml.read_text(encoding="utf-8"))
+        except (OSError, yaml.YAMLError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        provides = data.get("provides")
+        if not isinstance(provides, dict):
+            continue
+        commands = provides.get("commands")
+        if not isinstance(commands, list):
+            continue
+        ext_id = str(data.get("extension", {}).get("id", ext_dir.name))
+        for entry in commands:
+            if not isinstance(entry, dict):
+                continue
+            name = str(entry.get("name", "")).strip()
+            rel_file = str(entry.get("file", "")).strip()
+            if not name or not rel_file:
+                continue
+            src = ext_dir / rel_file
+            if not src.is_file():
+                continue
+
+            skill_name = name.replace(".", "-")
+            dest = skills_dir / skill_name / "SKILL.md"
+            if dest.exists():
+                continue
+
+            raw_markdown = src.read_text(encoding="utf-8")
+            frontmatter, body = _load_command_frontmatter(raw_markdown)
+            body = body.lstrip("\n")
+
+            scripts = frontmatter.get("scripts")
+            if isinstance(scripts, dict):
+                sh_script = scripts.get("sh")
+                if isinstance(sh_script, str) and "{SCRIPT}" in body:
+                    resolved = _resolve_skill_script_reference(workspace, ext_dir, ext_id, sh_script)
+                    body = body.replace("{SCRIPT}", resolved)
+
+            description = str(
+                frontmatter.get("description")
+                or entry.get("description")
+                or name
+            ).strip()
+            meta = {
+                "name": skill_name,
+                "description": description,
+                "compatibility": "Requires spec-kit project structure with .specify/ directory",
+                "metadata": {
+                    "author": "github-spec-kit",
+                    "source": f"{ext_id}:{rel_file}",
+                },
+            }
+            skills_dir.mkdir(parents=True, exist_ok=True)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            rendered = "---\n"
+            rendered += yaml.dump(meta, default_flow_style=False, sort_keys=False, allow_unicode=True)
+            rendered += "---\n\n"
+            rendered += body
+            if not rendered.endswith("\n"):
+                rendered += "\n"
+            dest.write_text(rendered, encoding="utf-8")
             created += 1
     return created
 
