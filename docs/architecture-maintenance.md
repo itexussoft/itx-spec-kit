@@ -3,12 +3,13 @@
 ## Runtime responsibility boundaries
 
 - `scripts/itx_init.py`: bootstrap entrypoint. Initializes workspace, installs presets/extensions, writes `.itx-config.yml`, and stages docs/knowledge.
-- `scripts/patch.py`: post-bootstrap updater. Applies kit updates to existing workspaces with safe handling for user-editable files.
+- `scripts/itx_specify.py`: shared specify-cli constants and helpers (`specify init` argv, allowed integration keys for the pinned spec-kit tag, `spec_kit_ref` loading, pinned **`EXTENSION_REFS`** for community extensions, **`install_community_extensions`**, workflow **materialization** and **registry mirror** helpers for `--add-ai`). Used by `itx_init.py` and `patch.py`.
+- `scripts/patch.py`: post-bootstrap updater. Applies kit updates to existing workspaces with safe handling for user-editable files. Optional **`--retarget-ai`** / **`--add-ai`** adjust Spec-Kit agent scaffolding while preserving Itexus-owned paths (retarget) or merging a second agent’s tree from a temp init (add); both require **specify** or **uvx** on `PATH`. After patch, both modes can re-run community extension install plus workflow/registry alignment for the target agent (unless **`--skip-add-ai-extension-sync`**).
 - `extensions/itx-gates/hooks/orchestrator.py`: runtime gate controller. Executes plan/implement validations and writes gate feedback artifacts.
 
 ## Reproducibility policy
 
-- Always pin upstream refs for community extensions in `scripts/itx_init.py` (`EXTENSION_REFS`).
+- Always pin upstream refs for community extensions in `scripts/itx_specify.py` (`EXTENSION_REFS`).
 - Avoid branch-based refs (`main`, `master`) in bootstrap defaults.
 - If bootstrap dependency refs change, update docs and run full local validation (`make compile`, `make test`, `make validate-catalog`).
 

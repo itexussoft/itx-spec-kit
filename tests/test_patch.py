@@ -1,11 +1,16 @@
+import json
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
+
+import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
+import itx_specify  # noqa: E402
 import patch as patch_mod  # noqa: E402
 
 
@@ -249,6 +254,157 @@ class PatchTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             result = patch_mod.main(["--workspace", tmp])
             self.assertEqual(result, 1)
+
+    def test_retarget_ai_restores_constitution_after_mock_overwrite(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp) / "ws"
+            spec = ws / ".specify"
+            spec.mkdir(parents=True)
+            (ws / ".itx-config.yml").write_text('spec_kit_ref: "v0.5.0"\n', encoding="utf-8")
+            const = spec / "constitution.md"
+            const.write_text("USER\n", encoding="utf-8")
+
+            def fake_run(_cli, _argv, _ref, quiet=False, cwd=None):
+                root = cwd if cwd is not None else ws
+                c = root / ".specify" / "constitution.md"
+                c.parent.mkdir(parents=True, exist_ok=True)
+                c.write_text("SPECIFY\n", encoding="utf-8")
+
+            with mock.patch("patch.detect_specify_cli", return_value="specify"):
+                with mock.patch("patch.run_specify", side_effect=fake_run):
+                    patch_mod.retarget_ai_workspace(
+                        ws, "claude", None, refresh_templates=False, quiet=True
+                    )
+
+            self.assertEqual(const.read_text(encoding="utf-8"), "USER\n")
+            cfg = yaml.safe_load((ws / ".itx-config.yml").read_text(encoding="utf-8"))
+            self.assertEqual(cfg.get("agents", {}).get("primary"), "claude")
+            self.assertIn("claude", cfg.get("agents", {}).get("installed", []))
+
+    def test_add_ai_copies_agent_tree_and_appends_installed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp) / "ws"
+            ws.mkdir()
+            (ws / ".itx-config.yml").write_text("domain: base\n", encoding="utf-8")
+
+            def fake_run(_cli, _argv, _ref, quiet=False, cwd=None):
+                root = Path(cwd)
+                wf = root / ".windsurf" / "workflows"
+                wf.mkdir(parents=True)
+                (wf / "speckit.plan.md").write_text("x", encoding="utf-8")
+
+            with mock.patch("patch.detect_specify_cli", return_value="specify"):
+                with mock.patch("patch.run_specify", side_effect=fake_run):
+                    patch_mod.add_ai_workspace(ws, "windsurf", None, quiet=True)
+
+            self.assertTrue((ws / ".windsurf" / "workflows" / "speckit.plan.md").exists())
+            cfg = yaml.safe_load((ws / ".itx-config.yml").read_text(encoding="utf-8"))
+            self.assertIn("windsurf", cfg.get("agents", {}).get("installed", []))
+
+            with mock.patch("patch.detect_specify_cli", return_value="specify"):
+                with mock.patch("patch.run_specify", side_effect=fake_run):
+                    patch_mod.add_ai_workspace(ws, "windsurf", None, quiet=True)
+            cfg = yaml.safe_load((ws / ".itx-config.yml").read_text(encoding="utf-8"))
+            self.assertEqual(cfg["agents"]["installed"].count("windsurf"), 1)
+
+    def test_post_agent_extension_sync_skips_when_flag(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp) / "ws"
+            ws.mkdir()
+            (ws / ".itx-config.yml").write_text("domain: base\n", encoding="utf-8")
+            with mock.patch("patch.install_community_extensions") as ic:
+                patch_mod.post_agent_extension_sync(
+                    ws, ROOT, "kilocode", skip_extension_sync=True
+                )
+                ic.assert_not_called()
+
+    def test_post_agent_extension_sync_runs_pipeline(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp) / "ws"
+            ws.mkdir()
+            (ws / ".itx-config.yml").write_text("domain: base\n", encoding="utf-8")
+            with mock.patch("patch.detect_specify_cli", return_value="specify"):
+                with mock.patch("patch.install_community_extensions") as ic:
+                    with mock.patch(
+                        "patch.materialize_extension_workflows_for_agent", return_value=2
+                    ) as mat:
+                        with mock.patch(
+                            "patch.mirror_registry_commands", return_value=True
+                        ) as mir:
+                            patch_mod.post_agent_extension_sync(
+                                ws, ROOT, "kilocode", skip_extension_sync=False
+                            )
+            ic.assert_called_once()
+            mat.assert_called_once_with(ws, "kilocode")
+            mir.assert_called_once_with(ws, "kilocode")
+
+    def test_main_retarget_ai_runs_extension_sync(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp) / "ws"
+            ws.mkdir()
+            (ws / ".itx-config.yml").write_text("domain: base\n", encoding="utf-8")
+
+            with mock.patch("patch.retarget_ai_workspace") as retarget:
+                with mock.patch("patch.patch_workspace", return_value=(0, [])):
+                    with mock.patch("patch.post_agent_extension_sync") as sync:
+                        result = patch_mod.main(
+                            ["--workspace", str(ws), "--retarget-ai", "codex"]
+                        )
+
+            self.assertEqual(result, 0)
+            retarget.assert_called_once()
+            sync.assert_called_once_with(
+                ws.resolve(),
+                ROOT,
+                "codex",
+                skip_extension_sync=False,
+            )
+
+    def test_materialize_extension_workflows_idempotent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp) / "w"
+            ws.mkdir()
+            (ws / ".kilocode" / "workflows").mkdir(parents=True)
+            ext = ws / ".specify" / "extensions" / "demoext"
+            ext.mkdir(parents=True)
+            cmd_dir = ext / "commands"
+            cmd_dir.mkdir()
+            (cmd_dir / "x.md").write_text("body\n", encoding="utf-8")
+            (ext / "extension.yml").write_text(
+                "schema_version: '1.0'\n"
+                "provides:\n"
+                "  commands:\n"
+                "    - name: speckit.demo.cmd\n"
+                "      file: commands/x.md\n",
+                encoding="utf-8",
+            )
+            n = itx_specify.materialize_extension_workflows_for_agent(ws, "kilocode")
+            self.assertEqual(n, 1)
+            dest = ws / ".kilocode" / "workflows" / "speckit.demo.cmd.md"
+            self.assertEqual(dest.read_text(encoding="utf-8"), "body\n")
+            self.assertEqual(
+                itx_specify.materialize_extension_workflows_for_agent(ws, "kilocode"), 0
+            )
+
+    def test_mirror_registry_commands_adds_target_key(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp) / "w"
+            reg_dir = ws / ".specify" / "extensions"
+            reg_dir.mkdir(parents=True)
+            data = {
+                "extensions": {
+                    "review": {
+                        "registered_commands": {"claude": ["speckit.review.run"]},
+                    }
+                }
+            }
+            (reg_dir / ".registry").write_text(
+                json.dumps(data, indent=2) + "\n", encoding="utf-8"
+            )
+            self.assertTrue(itx_specify.mirror_registry_commands(ws, "kilocode"))
+            loaded = json.loads((reg_dir / ".registry").read_text(encoding="utf-8"))
+            rc = loaded["extensions"]["review"]["registered_commands"]
+            self.assertEqual(rc["kilocode"], ["speckit.review.run"])
 
 
 class RunSpeckitTests(unittest.TestCase):

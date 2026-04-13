@@ -31,6 +31,7 @@ compile:
 		scripts/build_pattern_index.py \
 		scripts/build_knowledge_manifest.py \
 		scripts/itx_init.py \
+		scripts/itx_specify.py \
 		scripts/release.py \
 		scripts/patch.py \
 		tests/test_orchestrator.py \

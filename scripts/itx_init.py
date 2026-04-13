@@ -11,30 +11,26 @@ import os
 import shutil
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 import yaml
 from build_knowledge_manifest import build_manifest
 
-ALLOWED_AGENTS = {"cursor", "claude", "copilot", "gemini", "codex"}
+from itx_specify import (
+    DEFAULT_SPEC_KIT_REF,
+    EXTENSION_REFS,
+    detect_spec_cli,
+    install_community_extensions,
+    map_agent_for_specify,
+    run_checked,
+    run_specify,
+    specify_init_argv,
+    validate_init_agent,
+)
+
 ALLOWED_DOMAINS = {"base", "fintech-trading", "fintech-banking", "healthcare", "saas-platform"}
 ALLOWED_KNOWLEDGE_MODES = {"lazy", "eager"}
 ALLOWED_EXECUTION_MODES = {"mcp", "docker-fallback"}
-DEFAULT_SPEC_KIT_REF = "v0.5.0"
-EXTENSION_REFS = {
-    "dsrednicki/spec-kit-cleanup": "v1.0.0",
-    "ismaelJimenez/spec-kit-review": "v1.0.0",
-    "mbachorik/spec-kit-jira": "v0.2.0",
-}
-
-
-def _repo_url(extension_id: str) -> str:
-    return f"https://github.com/{extension_id}.git"
-
-
-def _archive_url(extension_id: str, ref: str) -> str:
-    return f"https://github.com/{extension_id}/archive/{ref}.zip"
 
 
 def log(message: str) -> None:
@@ -46,42 +42,8 @@ def debug(enabled: bool, message: str) -> None:
         print(f"[itx-init:debug] {message}")
 
 
-def map_agent_for_specify(agent: str) -> str:
-    return "cursor-agent" if agent == "cursor" else agent
-
-
-def detect_spec_cli() -> str:
-    for cmd in ("spec-kit", "specify", "uvx"):
-        if shutil.which(cmd):
-            return cmd
-    return ""
-
-
-def run_checked(command: list[str], quiet: bool = False, cwd: Path | None = None) -> None:
-    stdout = subprocess.DEVNULL if quiet else None
-    stderr = subprocess.DEVNULL if quiet else None
-    subprocess.run(command, check=True, cwd=str(cwd) if cwd else None, stdout=stdout, stderr=stderr)
-
-
-def run_specify(
-    spec_cli: str,
-    args: list[str],
-    spec_kit_ref: str,
-    quiet: bool = False,
-    cwd: Path | None = None,
-) -> None:
-    if spec_cli == "specify":
-        cmd = ["specify", *args]
-    elif spec_cli == "uvx":
-        cmd = ["uvx", "--from", f"git+https://github.com/github/spec-kit.git@{spec_kit_ref}", "specify", *args]
-    else:
-        raise RuntimeError(f"run_specify called with unsupported cli: {spec_cli}")
-    run_checked(cmd, quiet=quiet, cwd=cwd)
-
-
 def ensure_valid_args(args: argparse.Namespace) -> None:
-    if args.agent not in ALLOWED_AGENTS:
-        raise ValueError(f"Invalid --agent: {args.agent}")
+    validate_init_agent(args.agent, getattr(args, "generic_commands_dir", None) or None)
     if args.domain not in ALLOWED_DOMAINS:
         raise ValueError(f"Invalid --domain: {args.domain}")
     if args.knowledge_mode not in ALLOWED_KNOWLEDGE_MODES:
@@ -95,72 +57,6 @@ def ensure_valid_args(args: argparse.Namespace) -> None:
 def require_command(name: str) -> None:
     if shutil.which(name) is None:
         raise RuntimeError(f"Missing required command: {name}")
-
-
-def strip_legacy_extension_command_aliases(ext_dir: Path) -> None:
-    """Remove command `aliases` entries before `specify extension add`.
-
-    specify-cli 0.5+ rejects short forms like `speckit.cleanup`; canonical names
-    such as `speckit.cleanup.run` remain valid. Community extensions may still
-    ship legacy aliases until upstream tags are updated.
-    """
-    ext_yml = ext_dir / "extension.yml"
-    if not ext_yml.is_file():
-        return
-    try:
-        data = yaml.safe_load(ext_yml.read_text(encoding="utf-8"))
-    except (OSError, yaml.YAMLError):
-        return
-    if not isinstance(data, dict):
-        return
-    provides = data.get("provides")
-    if not isinstance(provides, dict):
-        return
-    commands = provides.get("commands")
-    if not isinstance(commands, list):
-        return
-    changed = False
-    for entry in commands:
-        if isinstance(entry, dict) and "aliases" in entry:
-            entry.pop("aliases", None)
-            changed = True
-    if changed:
-        ext_yml.write_text(
-            yaml.dump(data, default_flow_style=False, sort_keys=False, allow_unicode=True),
-            encoding="utf-8",
-        )
-
-
-def install_extension_from_git(
-    spec_cli: str,
-    repo_url: str,
-    git_ref: str,
-    local_dir: Path,
-    spec_extension_id: str,
-    spec_zip_url: str,
-    spec_kit_ref: str,
-    quiet: bool,
-    workspace: Path,
-) -> None:
-    if shutil.which("git"):
-        if not quiet:
-            log(f"Cloning extension: {repo_url}@{git_ref}")
-        run_checked(["git", "clone", repo_url, str(local_dir)], quiet=quiet)
-        run_checked(["git", "checkout", git_ref], quiet=quiet, cwd=local_dir)
-        strip_legacy_extension_command_aliases(local_dir)
-        if not quiet:
-            log(f"Installing extension from dev path: {local_dir}")
-        run_specify(spec_cli, ["extension", "add", str(local_dir), "--dev"], spec_kit_ref, quiet=quiet, cwd=workspace)
-        return
-
-    print(f"Warning: 'git' not found. Falling back to ZIP install for {spec_extension_id}@{git_ref}.", file=sys.stderr)
-    run_specify(
-        spec_cli,
-        ["extension", "add", spec_extension_id, "--from", spec_zip_url],
-        spec_kit_ref,
-        quiet=quiet,
-        cwd=workspace,
-    )
 
 
 def copy_tree_contents(source: Path, target: Path) -> None:
@@ -182,6 +78,7 @@ def write_itx_config(
     knowledge_mode: str,
     container_name: str,
     spec_kit_ref: str = DEFAULT_SPEC_KIT_REF,
+    primary_agent: str | None = None,
 ) -> None:
     lines = [
         f'domain: "{domain}"',
@@ -190,6 +87,8 @@ def write_itx_config(
         "knowledge:",
         f'  mode: "{knowledge_mode}"',
     ]
+    if primary_agent:
+        lines.extend(["agents:", f'  primary: "{primary_agent}"'])
     if execution_mode == "docker-fallback":
         lines.extend(
             [
@@ -325,6 +224,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Pinned git ref for uvx-based specify-cli execution (tag or commit SHA).",
     )
     parser.add_argument("--with-jira", action="store_true")
+    parser.add_argument(
+        "--generic-commands-dir",
+        default="",
+        help="Required when --agent generic: output directory for command files (passed to specify init).",
+    )
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--quiet", action="store_true")
     return parser.parse_args(argv)
@@ -338,11 +242,16 @@ def main(argv: list[str] | None = None) -> int:
     kit_root = script_dir.parent
     workspace = Path(args.workspace).expanduser().resolve()
     spec_cli = detect_spec_cli()
+    canonical_agent = map_agent_for_specify(args.agent)
 
     log("Checking host prerequisites...")
     require_command("python3")
     if not spec_cli:
         raise RuntimeError("Missing required command: either 'spec-kit', 'specify' (specify-cli), or 'uvx'.")
+    if spec_cli == "spec-kit" and canonical_agent == "generic":
+        raise RuntimeError(
+            "Agent 'generic' requires specify-cli or uvx (spec-kit init does not support generic here)."
+        )
     if args.execution_mode == "docker-fallback":
         require_command("docker")
     container_name = args.container_name or f"{args.project_name}-sandbox"
@@ -364,23 +273,19 @@ def main(argv: list[str] | None = None) -> int:
             quiet=args.quiet,
         )
     else:
-        specify_agent = map_agent_for_specify(args.agent)
-        debug(args.debug, f"Using specify-cli (specify). Agent: {specify_agent}")
+        debug(args.debug, f"Using specify-cli (specify). Agent: {canonical_agent}")
         debug(args.debug, f"Using spec-kit ref for uvx fallback: {args.spec_kit_ref}")
         script_type = "ps" if os.name == "nt" else "sh"
+        gdir = (args.generic_commands_dir or "").strip() or None
         try:
             run_specify(
                 spec_cli,
-                [
-                    "init",
-                    "--here",
-                    "--ai",
-                    specify_agent,
-                    "--script",
+                specify_init_argv(
+                    canonical_agent,
+                    gdir,
                     script_type,
-                    "--force",
-                    "--ignore-agent-tools",
-                ],
+                    use_force=True,
+                ),
                 args.spec_kit_ref,
                 quiet=args.quiet,
                 cwd=workspace,
@@ -388,15 +293,12 @@ def main(argv: list[str] | None = None) -> int:
         except subprocess.CalledProcessError:
             run_specify(
                 spec_cli,
-                [
-                    "init",
-                    "--here",
-                    "--ai",
-                    specify_agent,
-                    "--script",
+                specify_init_argv(
+                    canonical_agent,
+                    gdir,
                     script_type,
-                    "--ignore-agent-tools",
-                ],
+                    use_force=False,
+                ),
                 args.spec_kit_ref,
                 quiet=args.quiet,
                 cwd=workspace,
@@ -516,54 +418,25 @@ def main(argv: list[str] | None = None) -> int:
                     f"(overlay presets may lack templates). "
                     f"Content will be staged by the file-copy step."
                 )
-        run_specify(
+        install_community_extensions(
             spec_cli,
-            ["extension", "add", str(kit_root / "extensions" / "itx-gates"), "--dev"],
+            kit_root,
+            workspace,
             args.spec_kit_ref,
             quiet=args.quiet,
-            cwd=workspace,
+            with_jira=args.with_jira,
+            log_fn=log,
         )
-
-        with tempfile.TemporaryDirectory() as temp_ext_dir:
-            temp_root = Path(temp_ext_dir)
-            install_extension_from_git(
-                spec_cli,
-                _repo_url("dsrednicki/spec-kit-cleanup"),
-                EXTENSION_REFS["dsrednicki/spec-kit-cleanup"],
-                temp_root / "spec-kit-cleanup",
-                "dsrednicki/spec-kit-cleanup",
-                _archive_url("dsrednicki/spec-kit-cleanup", EXTENSION_REFS["dsrednicki/spec-kit-cleanup"]),
-                args.spec_kit_ref,
-                args.quiet,
-                workspace,
-            )
-            install_extension_from_git(
-                spec_cli,
-                _repo_url("ismaelJimenez/spec-kit-review"),
-                EXTENSION_REFS["ismaelJimenez/spec-kit-review"],
-                temp_root / "spec-kit-review",
-                "ismaelJimenez/spec-kit-review",
-                _archive_url("ismaelJimenez/spec-kit-review", EXTENSION_REFS["ismaelJimenez/spec-kit-review"]),
-                args.spec_kit_ref,
-                args.quiet,
-                workspace,
-            )
-            if args.with_jira:
-                install_extension_from_git(
-                    spec_cli,
-                    _repo_url("mbachorik/spec-kit-jira"),
-                    EXTENSION_REFS["mbachorik/spec-kit-jira"],
-                    temp_root / "spec-kit-jira",
-                    "mbachorik/spec-kit-jira",
-                    _archive_url("mbachorik/spec-kit-jira", EXTENSION_REFS["mbachorik/spec-kit-jira"]),
-                    args.spec_kit_ref,
-                    args.quiet,
-                    workspace,
-                )
 
     log("Writing .itx-config.yml...")
     write_itx_config(
-        workspace, args.domain, args.execution_mode, args.knowledge_mode, container_name, args.spec_kit_ref
+        workspace,
+        args.domain,
+        args.execution_mode,
+        args.knowledge_mode,
+        container_name,
+        args.spec_kit_ref,
+        primary_agent=canonical_agent,
     )
     stage_docs_and_policy(kit_root, workspace, args.domain)
     stage_templates(kit_root, workspace)

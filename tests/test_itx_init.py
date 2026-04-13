@@ -1,3 +1,4 @@
+import argparse
 import sys
 import tempfile
 import unittest
@@ -8,16 +9,30 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import itx_init  # noqa: E402
+import itx_specify  # noqa: E402
+
+
+def _valid_args(**overrides):
+    base = {
+        "agent": "claude",
+        "domain": "base",
+        "knowledge_mode": "lazy",
+        "execution_mode": "mcp",
+        "spec_kit_ref": itx_init.DEFAULT_SPEC_KIT_REF,
+        "generic_commands_dir": "",
+    }
+    base.update(overrides)
+    return argparse.Namespace(**base)
 
 
 class ItxInitTests(unittest.TestCase):
     def test_extension_refs_are_pinned(self):
-        for ref in itx_init.EXTENSION_REFS.values():
+        for ref in itx_specify.EXTENSION_REFS.values():
             self.assertTrue(ref)
             self.assertNotEqual(ref, "main")
 
     def test_archive_url_uses_ref(self):
-        url = itx_init._archive_url("owner/repo", "v1.2.3")
+        url = itx_specify.extension_archive_url("owner/repo", "v1.2.3")
         self.assertEqual(url, "https://github.com/owner/repo/archive/v1.2.3.zip")
 
     def test_strip_legacy_extension_command_aliases_removes_aliases(self):
@@ -33,7 +48,7 @@ class ItxInitTests(unittest.TestCase):
                 "      aliases: [speckit.cleanup]\n",
                 encoding="utf-8",
             )
-            itx_init.strip_legacy_extension_command_aliases(ext_dir)
+            itx_specify.strip_legacy_extension_command_aliases(ext_dir)
             text = (ext_dir / "extension.yml").read_text(encoding="utf-8")
             self.assertNotIn("aliases", text)
 
@@ -43,18 +58,18 @@ class ItxInitTests(unittest.TestCase):
             workspace = Path(tmp) / "ws"
             workspace.mkdir()
             with (
-                mock.patch("itx_init.shutil.which", return_value="/usr/bin/git"),
-                mock.patch("itx_init.run_checked") as run_checked,
-                mock.patch("itx_init.run_specify") as run_specify,
+                mock.patch("itx_specify.shutil.which", return_value="/usr/bin/git"),
+                mock.patch("itx_specify.run_checked") as run_checked,
+                mock.patch("itx_specify.run_specify") as run_specify,
             ):
-                itx_init.install_extension_from_git(
+                itx_specify.install_extension_from_git(
                     spec_cli="specify",
                     repo_url="https://github.com/owner/repo.git",
                     git_ref="v1.2.3",
                     local_dir=local_dir,
                     spec_extension_id="owner/repo",
                     spec_zip_url="https://github.com/owner/repo/archive/v1.2.3.zip",
-                    spec_kit_ref=itx_init.DEFAULT_SPEC_KIT_REF,
+                    spec_kit_ref=itx_specify.DEFAULT_SPEC_KIT_REF,
                     quiet=True,
                     workspace=workspace,
                 )
@@ -194,6 +209,37 @@ class ItxInitTests(unittest.TestCase):
             ]
         )
         self.assertEqual(args.spec_kit_ref, "main")
+
+    def test_map_agent_aliases(self):
+        self.assertEqual(itx_specify.map_agent_for_specify("cursor"), "cursor-agent")
+        self.assertEqual(itx_specify.map_agent_for_specify("kiro"), "kiro-cli")
+        self.assertEqual(itx_specify.map_agent_for_specify("windsurf"), "windsurf")
+
+    def test_ensure_valid_args_rejects_unknown_agent(self):
+        with self.assertRaises(ValueError):
+            itx_init.ensure_valid_args(_valid_args(agent="not-a-real-integration"))
+
+    def test_ensure_valid_args_generic_requires_commands_dir(self):
+        with self.assertRaises(ValueError):
+            itx_init.ensure_valid_args(_valid_args(agent="generic", generic_commands_dir=""))
+        itx_init.ensure_valid_args(
+            _valid_args(agent="generic", generic_commands_dir=".myagent/commands/")
+        )
+
+    def test_write_itx_config_includes_primary_agent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            itx_init.write_itx_config(
+                workspace=ws,
+                domain="base",
+                execution_mode="mcp",
+                knowledge_mode="lazy",
+                container_name="x",
+                primary_agent="cursor-agent",
+            )
+            text = (ws / ".itx-config.yml").read_text(encoding="utf-8")
+            self.assertIn("agents:", text)
+            self.assertIn('primary: "cursor-agent"', text)
 
 
 if __name__ == "__main__":
