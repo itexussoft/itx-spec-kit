@@ -1,0 +1,1062 @@
+#!/usr/bin/env python3
+"""Shared gate orchestrator helpers and policy-driven validation primitives."""
+
+from __future__ import annotations
+
+import argparse
+import ast
+import json
+import re
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any, Dict, List, Literal, Mapping, Sequence, cast
+
+import yaml
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from validators import Finding, should_skip_path
+
+TIER_1: Literal["tier1"] = "tier1"
+TIER_2: Literal["tier2"] = "tier2"
+RETRY_STATE_PREFIX = "- Retry-State: `"
+
+
+DOMAIN_VALIDATORS: Dict[str, str] = {
+    "fintech-trading": "validators.trading_ast",
+    "fintech-banking": "validators.banking_heuristic",
+    "healthcare": "validators.health_regex",
+    "saas-platform": "validators.saas_platform_heuristic",
+}
+
+# Inline fallback used when policy.yml is not available in the workspace.
+_DEFAULT_POLICY: Dict[str, Any] = {
+    "work_classes": {
+        "feature": {
+            "allowed_templates": ["system-design-plan-template.md"],
+            "mandatory_sections": [
+                "## 4. Architectural Patterns Applied",
+                "## 4b. Code-Level Design Patterns Applied",
+                "## 5. DDD Aggregates",
+                "## 13. Test Strategy",
+            ],
+            "pattern_selection": "required",
+            "task_policy": "required",
+            "testing_expectation": "e2e-required",
+            "gate_profile": "feature-strict",
+        },
+        "patch": {
+            "allowed_templates": ["patch-plan-template.md"],
+            "mandatory_sections": [
+                "## 1. Problem Statement",
+                "## 2. Files / Modules Affected",
+            ],
+            "pattern_selection": "optional",
+            "task_policy": "required",
+            "testing_expectation": "regression-required",
+            "gate_profile": "patch-safe",
+        },
+        "refactor": {
+            "allowed_templates": ["refactor-plan-template.md"],
+            "mandatory_sections": [
+                "## 1. Goal",
+                "## 2. Scope / Non-Scope",
+                "## 3. Invariants to Preserve",
+                "## 4. Public Contract Impact",
+                "## 5. Behavioral Equivalence Strategy",
+                "## 6. Regression Strategy",
+            ],
+            "pattern_selection": "optional",
+            "task_policy": "optional",
+            "testing_expectation": "regression-required",
+            "gate_profile": "refactor-safe",
+        },
+        "bugfix": {
+            "allowed_templates": ["bugfix-report-template.md"],
+            "mandatory_sections": [
+                "## 1. Symptom",
+                "## 2. Reproduction",
+                "## 3. Expected Behavior",
+                "## 4. Regression Test Target",
+                "## 5. Root Cause",
+                "## 6. Fix Strategy",
+            ],
+            "pattern_selection": "optional",
+            "task_policy": "optional",
+            "testing_expectation": "regression-required",
+            "gate_profile": "bugfix-fast",
+        },
+        "migration": {
+            "allowed_templates": ["system-design-plan-template.md", "patch-plan-template.md"],
+            "mandatory_sections": [
+                "## 4. Architectural Patterns Applied",
+                "## 4b. Code-Level Design Patterns Applied",
+                "## 5. DDD Aggregates",
+                "## 13. Test Strategy",
+            ],
+            "pattern_selection": "required",
+            "task_policy": "required",
+            "testing_expectation": "e2e-required",
+            "gate_profile": "feature-strict",
+        },
+        "tooling": {
+            "allowed_templates": ["patch-plan-template.md"],
+            "mandatory_sections": [
+                "## 1. Problem Statement",
+                "## 2. Files / Modules Affected",
+            ],
+            "pattern_selection": "optional",
+            "task_policy": "required",
+            "testing_expectation": "regression-required",
+            "gate_profile": "patch-safe",
+        },
+        "spike": {
+            "allowed_templates": ["patch-plan-template.md"],
+            "mandatory_sections": [
+                "## 1. Problem Statement",
+                "## 2. Files / Modules Affected",
+            ],
+            "pattern_selection": "optional",
+            "task_policy": "optional",
+            "testing_expectation": "advisory",
+            "gate_profile": "spike-light",
+        },
+    },
+    "legacy_plan_filename_work_class": {
+        "system-design-plan": "feature",
+        "patch-plan": "patch",
+    },
+    "plan_tiers": {
+        "system": {
+            "match_filename": "system-design-plan",
+            "mandatory_sections": [
+                "## 4. Architectural Patterns Applied",
+                "## 4b. Code-Level Design Patterns Applied",
+                "## 5. DDD Aggregates",
+                "## 13. Test Strategy",
+            ],
+            "pattern_selection": "required",
+        },
+        "patch": {
+            "match_filename": "patch-plan",
+            "mandatory_sections": [
+                "## 1. Problem Statement",
+                "## 2. Files / Modules Affected",
+            ],
+            "pattern_selection": "optional",
+        },
+    },
+    "placeholder_markers": ["_e.g.,", "e.g.,", "MANDATORY"],
+    "gate": {"default_max_tier1_retries": 3, "heuristic_retry_escalates": False},
+    "rules": {
+        "e2e-test-presence": {
+            "severity": "tier1",
+            "confidence": "deterministic",
+            "remediation_owner": "feature-team",
+        },
+        "e2e-test-empty": {
+            "severity": "tier1",
+            "confidence": "deterministic",
+            "remediation_owner": "feature-team",
+        },
+        "e2e-test-placeholder": {
+            "severity": "tier1",
+            "confidence": "heuristic",
+            "remediation_owner": "feature-team",
+        },
+        "e2e-test-family-empty": {
+            "severity": "tier1",
+            "confidence": "deterministic",
+            "remediation_owner": "feature-team",
+        },
+        "trading-no-float-money": {
+            "severity": "tier2",
+            "confidence": "deterministic",
+            "remediation_owner": "domain-team",
+        },
+        "trading-idempotency-key-missing": {
+            "severity": "tier2",
+            "confidence": "deterministic",
+            "remediation_owner": "domain-team",
+        },
+        "trading-order-lifecycle-illegal-transition": {
+            "severity": "tier2",
+            "confidence": "deterministic",
+            "remediation_owner": "domain-team",
+        },
+        "trading-hotpath-blocking-io": {
+            "severity": "tier2",
+            "confidence": "deterministic",
+            "remediation_owner": "domain-team",
+        },
+        "trading-replay-protection-missing": {
+            "severity": "tier1",
+            "confidence": "heuristic",
+            "remediation_owner": "domain-team",
+        },
+        "banking-pci-pan-storage": {
+            "severity": "tier1",
+            "confidence": "heuristic",
+            "remediation_owner": "security-team",
+        },
+        "banking-ledger-inplace-mutation": {
+            "severity": "tier2",
+            "confidence": "deterministic",
+            "remediation_owner": "domain-team",
+        },
+        "banking-idempotency-key-missing": {
+            "severity": "tier2",
+            "confidence": "deterministic",
+            "remediation_owner": "domain-team",
+        },
+        "banking-payment-boundary-controls-missing": {
+            "severity": "tier1",
+            "confidence": "heuristic",
+            "remediation_owner": "security-team",
+        },
+        "banking-psd2-sca-missing-advisory": {
+            "severity": "tier1",
+            "confidence": "heuristic",
+            "remediation_owner": "domain-team",
+        },
+        "healthcare-phi-logging": {
+            "severity": "tier1",
+            "confidence": "heuristic",
+            "remediation_owner": "security-team",
+        },
+        "saas-tenant-filter-missing": {
+            "severity": "tier1",
+            "confidence": "heuristic",
+            "remediation_owner": "domain-team",
+        },
+        "saas-global-cache-key": {
+            "severity": "tier1",
+            "confidence": "heuristic",
+            "remediation_owner": "domain-team",
+        },
+        "completion-tasks-unchecked": {
+            "severity": "tier1",
+            "confidence": "deterministic",
+            "remediation_owner": "feature-team",
+        },
+        "completion-tier2-outstanding": {
+            "severity": "tier2",
+            "confidence": "deterministic",
+            "remediation_owner": "feature-team",
+        },
+    },
+}
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Itexus spec-kit gate orchestrator")
+    parser.add_argument("--event", required=True, help="Lifecycle event (e.g. after_implement)")
+    parser.add_argument("--workspace", required=True, help="Target workspace root")
+    return parser.parse_args()
+
+
+def load_config(workspace: Path) -> Dict:
+    config_path = workspace / ".itx-config.yml"
+    if not config_path.exists():
+        raise FileNotFoundError(f"Missing config: {config_path}")
+    text = config_path.read_text(encoding="utf-8")
+    return yaml.safe_load(text) or {}
+
+
+def load_policy(workspace: Path) -> Dict[str, Any]:
+    """Load policy.yml from the workspace, warning when fallback is used."""
+    policy_path = workspace / ".specify" / "policy.yml"
+    if not policy_path.exists():
+        sys.stderr.write(f"[itx-gates] Warning: missing policy file at {policy_path}; using built-in defaults.\n")
+        return dict(_DEFAULT_POLICY)
+    try:
+        data = yaml.safe_load(policy_path.read_text(encoding="utf-8"))
+    except (yaml.YAMLError, OSError) as exc:
+        sys.stderr.write(f"[itx-gates] Warning: failed to parse policy file at {policy_path}: {exc}; using built-in defaults.\n")
+        return dict(_DEFAULT_POLICY)
+    if isinstance(data, dict):
+        return data
+    sys.stderr.write(f"[itx-gates] Warning: policy file at {policy_path} is not a mapping; using built-in defaults.\n")
+    return dict(_DEFAULT_POLICY)
+
+
+def _parse_bool(value: Any, default: bool = False) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "1", "yes", "on"}:
+            return True
+        if normalized in {"false", "0", "no", "off"}:
+            return False
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return default
+
+
+def _parse_retry_limit(raw_value: Any, default: int) -> int:
+    try:
+        parsed = int(raw_value)
+    except (TypeError, ValueError):
+        sys.stderr.write(f"[itx-gates] Warning: invalid gate.max_tier1_retries value '{raw_value}'; using default {default}.\n")
+        return default
+    if parsed < 0:
+        sys.stderr.write(f"[itx-gates] Warning: negative gate.max_tier1_retries value '{raw_value}'; using default {default}.\n")
+        return default
+    return parsed
+
+
+def load_knowledge_manifest(workspace: Path) -> Dict[str, Any]:
+    manifest_path = workspace / ".specify" / "knowledge-manifest.json"
+    if not manifest_path.exists():
+        return {}
+    try:
+        data = json.loads(manifest_path.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def ensure_feedback_path(workspace: Path) -> Path:
+    feedback_path = workspace / ".specify" / "context" / "gate_feedback.md"
+    feedback_path.parent.mkdir(parents=True, exist_ok=True)
+    return feedback_path
+
+
+def _retry_key(event: str, finding: Finding) -> str:
+    return f"{event}::{finding.get('rule', 'unspecified')}"
+
+
+def read_tier1_retry_state(workspace: Path) -> Dict[str, int]:
+    feedback_path = ensure_feedback_path(workspace)
+    if not feedback_path.exists():
+        return {}
+    for line in feedback_path.read_text(encoding="utf-8").splitlines():
+        if not line.startswith(RETRY_STATE_PREFIX):
+            continue
+        payload = line.split("`", maxsplit=2)
+        if len(payload) < 2:
+            continue
+        try:
+            raw_state = json.loads(payload[1])
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(raw_state, dict):
+            continue
+        normalized: Dict[str, int] = {}
+        for key, value in raw_state.items():
+            if isinstance(key, str) and isinstance(value, int) and value >= 0:
+                normalized[key] = value
+        return normalized
+    return {}
+
+
+def write_gate_feedback(
+    workspace: Path,
+    event: str,
+    tier1_findings: List[Finding],
+    tier2_findings: List[Finding],
+    retry_state: Dict[str, int],
+    retry_limit: int,
+) -> None:
+    """Write unified feedback for both Tier 1 and Tier 2 findings."""
+    feedback_path = ensure_feedback_path(workspace)
+    max_retry = max(retry_state.values(), default=0)
+
+    action = "hard-halt" if tier2_findings else "auto-correction requested"
+    payload = [
+        "# Gate Feedback",
+        "",
+        f"- Event: `{event}`",
+        f"- Action: {action}",
+        f"- Retry: `{max_retry} / {retry_limit}`",
+        f"- Retry-State: `{json.dumps(retry_state, sort_keys=True)}`",
+        "",
+    ]
+
+    all_findings = list(tier1_findings) + list(tier2_findings)
+    for idx, item in enumerate(all_findings, start=1):
+        severity = item.get("severity", TIER_1)
+        retry_count = retry_state.get(_retry_key(event, item), 0)
+        payload.extend(
+            [
+                f"## Finding {idx}",
+                f"- Severity: `{severity}`",
+                f"- Rule: `{item.get('rule', 'unspecified')}`",
+                f"- Retry: `{retry_count} / {retry_limit}`",
+                f"- Message: {item.get('message', 'No details provided.')}",
+                (f"- Confidence: `{item.get('confidence')}`" if item.get("confidence") else ""),
+                (f"- Remediation: {item.get('remediation')}" if item.get("remediation") else ""),
+                (f"- Remediation Owner: `{item.get('remediation_owner')}`" if item.get("remediation_owner") else ""),
+                "",
+            ]
+        )
+    feedback_path.write_text("\n".join(payload), encoding="utf-8")
+
+
+def run_docker_exec(container_name: str, command: List[str]) -> subprocess.CompletedProcess:
+    full_cmd = ["docker", "exec", container_name, *command]
+    try:
+        return subprocess.run(full_cmd, check=False, capture_output=True, text=True)
+    except FileNotFoundError as exc:
+        return subprocess.CompletedProcess(full_cmd, 127, stdout="", stderr=f"Docker CLI not found: {exc}")
+    except OSError as exc:
+        return subprocess.CompletedProcess(full_cmd, 1, stdout="", stderr=f"Failed to execute docker command: {exc}")
+
+
+PATTERN_FILENAME_RE = re.compile(r"\b([a-z0-9][a-z0-9\-]*\.md)\b", re.IGNORECASE)
+E2E_FILE_PATTERNS = [
+    "e2e_test_*.py",
+    "*.e2e-spec.ts",
+    "*.e2e-spec.js",
+    "*.e2e.test.ts",
+    "*.e2e.test.js",
+]
+E2E_PLACEHOLDER_RE = re.compile(r"\b(todo|tbd|fixme)\b", re.IGNORECASE)
+E2E_PY_PASS_RE = re.compile(r"^\s*pass\s*(#.*)?$", re.MULTILINE)
+JS_TS_EXPECT_RE = re.compile(r"\bexpect\s*\(.+?\)\s*\.\s*\w+\s*\(", re.DOTALL)
+JS_TS_ASSERT_RE = re.compile(r"\bassert\s*\(", re.DOTALL)
+JS_TS_SHOULD_RE = re.compile(r"\bshould\s*\.", re.DOTALL)
+TASK_UNCHECKED_RE = re.compile(r"^\s*-\s+\[\s\]\s+(.+)$", re.MULTILINE)
+TASK_CHECKED_RE = re.compile(r"^\s*-\s+\[[xX]\]\s+(.+)$", re.MULTILINE)
+FINDING_RULE_RE = re.compile(r"- Rule:\s+`([^`]+)`")
+FINDING_SEVERITY_RE = re.compile(r"- Severity:\s+`([^`]+)`")
+FINDING_MESSAGE_RE = re.compile(r"- Message:\s+(.+)")
+MARKDOWN_FILE_REF_RE = re.compile(
+    r"`([A-Za-z0-9_./-]+\.(?:py|ts|js|tsx|jsx|java|go|rs|rb|php|sql|md|ya?ml|json|toml|sh|ps1))`"
+)
+PLAIN_FILE_REF_RE = re.compile(
+    r"\b([A-Za-z0-9_./-]+\.(?:py|ts|js|tsx|jsx|java|go|rs|rb|php|sql|md|ya?ml|json|toml|sh|ps1))\b"
+)
+PACKAGE_ACTION_RE = re.compile(
+    r"\b(pip install|pip uninstall|npm install|npm uninstall|npm remove|pnpm add|pnpm remove|yarn add|yarn remove|poetry add|poetry remove|uv add|uv remove)\b",
+    re.IGNORECASE,
+)
+
+RULE_REMEDIATION_HINTS: Dict[str, str] = {
+    "plan-presence": "Generate a plan from the current feature using the appropriate template.",
+    "plan-section-missing": "Add all required headings and provide concrete design decisions under each section.",
+    "plan-section-placeholder": "Replace placeholder text with implementation-specific content.",
+    "tasks-presence": "Generate tasks.md in a supported location (for example specs/**/tasks.md) before continuing.",
+    "tasks-checkbox-format": "Convert task items to checkbox syntax: '- [ ]' (pending) / '- [x]' (done).",
+    "e2e-test-presence": "Add at least one E2E test file using the documented naming conventions.",
+    "e2e-test-empty": "Add explicit assertions that verify behavior outcomes and persisted side-effects.",
+    "e2e-test-placeholder": "Replace placeholder TODO/pass bodies with executable test steps and assertions.",
+    "e2e-test-family-empty": "Ensure each detected E2E test family has at least one file with assertions.",
+    "completion-tasks-unchecked": "Mark all implementation tasks as completed (`- [x]`) before running delivery checks.",
+    "completion-tier2-outstanding": "Resolve Tier 2 findings in gate_feedback.md or escalate for explicit human override.",
+    "knowledge-pattern-selection-missing": "Declare selected pattern filenames using a structured selection block.",
+    "knowledge-pattern-unresolved": "Fix pattern filenames to match entries from .specify/pattern-index.md.",
+    "trading-idempotency-key-missing": "Require and persist idempotency keys for trading command entrypoints.",
+    "trading-order-lifecycle-illegal-transition": "Enforce order state machine transitions according to documented lifecycle.",
+    "trading-hotpath-blocking-io": "Remove blocking I/O from hot paths; use async/non-blocking infra boundaries.",
+    "trading-replay-protection-missing": "Add deduplication or replay protection markers (nonce/event_id/sequence).",
+    "banking-ledger-inplace-mutation": "Replace in-place balance updates with append-only ledger entries and derived balances.",
+    "banking-idempotency-key-missing": "Require and persist idempotency keys for payment commands/endpoints.",
+    "banking-payment-boundary-controls-missing": "Add explicit SCA and authorization controls at payment entrypoints.",
+    "banking-psd2-sca-missing-advisory": "Document or implement SCA controls (middleware/policy/decorator) for payment flows.",
+    "saas-tenant-filter-missing": "Add tenant_id filters or RLS session variables for all tenant-scoped queries.",
+    "saas-global-cache-key": "Namespace cache keys with tenant id (e.g. t:{tenant_id}:...) to prevent cross-tenant leakage.",
+}
+RULE_DEFAULT_META: Dict[str, Dict[str, str]] = {
+    "trading-no-float-money": {"confidence": "deterministic", "remediation_owner": "domain-team"},
+    "e2e-test-presence": {"confidence": "deterministic", "remediation_owner": "feature-team"},
+    "tasks-presence": {"confidence": "deterministic", "remediation_owner": "feature-team"},
+    "plan-section-missing": {"confidence": "deterministic", "remediation_owner": "feature-team"},
+}
+
+
+def _extract_markdown_h2_sections(content: str) -> Dict[str, str]:
+    """Map H2 heading lines to their body content, excluding fenced code blocks."""
+    heading_to_body: Dict[str, str] = {}
+    lines = content.splitlines()
+    in_code_fence = False
+    current_heading: str | None = None
+    current_body: List[str] = []
+
+    def flush_current() -> None:
+        nonlocal current_heading, current_body
+        if current_heading is not None:
+            heading_to_body[current_heading] = "\n".join(current_body).strip()
+        current_heading = None
+        current_body = []
+
+    for raw_line in lines:
+        stripped = raw_line.strip()
+        if stripped.startswith("```") or stripped.startswith("~~~"):
+            in_code_fence = not in_code_fence
+            continue
+        if in_code_fence:
+            continue
+        if raw_line.startswith("## "):
+            flush_current()
+            current_heading = raw_line.strip()
+            continue
+        if current_heading is not None:
+            current_body.append(raw_line)
+
+    flush_current()
+    return heading_to_body
+
+
+def _find_plan_files(workspace: Path) -> List[Path]:
+    plan_files: List[Path] = []
+    for pattern in ("*plan*.md", "*report*.md", "*note*.md"):
+        for path in sorted((workspace / "specs").glob(f"**/{pattern}")) if (workspace / "specs").exists() else []:
+            try:
+                rel = path.relative_to(workspace)
+            except ValueError:
+                continue
+            if should_skip_path(rel):
+                continue
+            lower_name = path.name.lower()
+            if (
+                "system-design-plan" in lower_name
+                or "patch-plan" in lower_name
+                or "refactor-plan" in lower_name
+                or "bugfix-report" in lower_name
+                or "migration-plan" in lower_name
+                or "tooling-plan" in lower_name
+                or "spike-note" in lower_name
+            ):
+                plan_files.append(path)
+    deduped: List[Path] = []
+    seen: set[Path] = set()
+    for path in plan_files:
+        if path not in seen:
+            deduped.append(path)
+            seen.add(path)
+    return deduped
+
+
+def _find_task_files(workspace: Path) -> List[Path]:
+    task_files: List[Path] = []
+    for path in sorted(workspace.glob("**/tasks.md")):
+        try:
+            rel = path.relative_to(workspace)
+        except ValueError:
+            continue
+        if rel.parts and rel.parts[0] != ".specify" and should_skip_path(rel):
+            continue
+        task_files.append(path)
+    return task_files
+
+
+def _is_bare_task_item(line: str) -> bool:
+    stripped = line.lstrip()
+    if not stripped.startswith("- "):
+        return False
+    if re.match(r"^-\s+\[[ xX]\]\s+", stripped):
+        return False
+    return bool(re.match(r"^-\s+[A-Za-z0-9T]", stripped))
+
+
+def _classify_heading_scope(heading_text: str) -> str | None:
+    normalized = heading_text.strip().lower()
+    if normalized == "tasks" or normalized.endswith(" tasks"):
+        return "tasks"
+    if normalized in {"notes", "context", "references", "links", "metadata", "background", "format rules"}:
+        return "notes"
+    return None
+
+
+def _validate_tasks_checkbox_format(task_files: List[Path]) -> List[Finding]:
+    findings: List[Finding] = []
+    for task_file in task_files:
+        lines = task_file.read_text(encoding="utf-8", errors="ignore").splitlines()
+        heading_stack: List[str] = []
+        scoped_mode: str | None = None
+        for line in lines:
+            stripped = line.strip()
+            heading_match = re.match(r"^(#{1,6})\s+(.*)$", line)
+            if heading_match:
+                level = len(heading_match.group(1))
+                text = heading_match.group(2).strip()
+                while len(heading_stack) >= level:
+                    heading_stack.pop()
+                heading_stack.append(text)
+                scope = _classify_heading_scope(text)
+                if scope == "tasks":
+                    scoped_mode = "tasks"
+                elif scope == "notes":
+                    scoped_mode = "notes"
+                continue
+
+            if not stripped:
+                continue
+            if scoped_mode == "notes":
+                continue
+            if _is_bare_task_item(line):
+                findings.append(
+                    {
+                        "severity": TIER_1,
+                        "rule": "tasks-checkbox-format",
+                        "message": (
+                            f"Tasks file '{task_file.relative_to(task_file.parents[2] if len(task_file.parents) > 2 else task_file.parent)}' "
+                            "contains bare list items. Use '- [ ]' or '- [x]' checkbox syntax for every task."
+                        ),
+                    }
+                )
+                break
+    return findings
+
+
+def _find_e2e_test_files(workspace: Path) -> List[Path]:
+    files: List[Path] = []
+    for pattern in E2E_FILE_PATTERNS:
+        for path in sorted(workspace.glob(f"**/{pattern}")):
+            try:
+                rel = path.relative_to(workspace)
+            except ValueError:
+                continue
+            if should_skip_path(rel):
+                continue
+            files.append(path)
+    deduped: List[Path] = []
+    seen: set[Path] = set()
+    for path in files:
+        if path not in seen:
+            deduped.append(path)
+            seen.add(path)
+    return deduped
+
+
+def _e2e_family(path: Path) -> str:
+    name = path.name
+    if name.startswith("e2e_test_") and name.endswith(".py"):
+        return name[len("e2e_test_") : -len(".py")]
+    suffixes = (".e2e-spec.ts", ".e2e-spec.js", ".e2e.test.ts", ".e2e.test.js")
+    for suffix in suffixes:
+        if name.endswith(suffix):
+            return name[: -len(suffix)]
+    return name
+
+
+def _python_has_assertions(text: str) -> bool:
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return False
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assert):
+            return True
+        if isinstance(node, ast.Call):
+            func = node.func
+            if isinstance(func, ast.Attribute) and func.attr.startswith("assert"):
+                return True
+    return False
+
+
+def _strip_js_ts_comments(text: str) -> str:
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
+    text = re.sub(r"//.*", "", text)
+    return text
+
+
+def _js_ts_has_assertions(text: str) -> bool:
+    stripped = _strip_js_ts_comments(text)
+    return bool(JS_TS_EXPECT_RE.search(stripped) or JS_TS_ASSERT_RE.search(stripped) or JS_TS_SHOULD_RE.search(stripped))
+
+
+def _e2e_has_assertion(path: Path, text: str) -> bool:
+    if path.suffix == ".py":
+        return _python_has_assertions(text)
+    if path.suffix in {".ts", ".js"}:
+        return _js_ts_has_assertions(text)
+    return False
+
+
+def _has_placeholder_test_content(path: Path, text: str) -> bool:
+    if E2E_PLACEHOLDER_RE.search(text):
+        return True
+    if path.suffix == ".py" and E2E_PY_PASS_RE.search(text):
+        return True
+    return False
+
+
+def check_e2e_test_presence(workspace: Path) -> List[Finding]:
+    findings: List[Finding] = []
+    test_files = _find_e2e_test_files(workspace)
+    if not test_files:
+        return [
+            {
+                "severity": TIER_1,
+                "rule": "e2e-test-presence",
+                "message": "No E2E tests found. Add at least one E2E test file before implementation completes.",
+            }
+        ]
+
+    family_has_assertion: Dict[str, bool] = {}
+    for path in test_files:
+        family = _e2e_family(path)
+        family_has_assertion.setdefault(family, False)
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        has_assertion = _e2e_has_assertion(path, text)
+        if has_assertion:
+            family_has_assertion[family] = True
+        else:
+            findings.append(
+                {
+                    "severity": TIER_1,
+                    "rule": "e2e-test-empty",
+                    "message": f"E2E test '{path.name}' does not contain explicit assertions.",
+                }
+            )
+        if _has_placeholder_test_content(path, text):
+            findings.append(
+                {
+                    "severity": TIER_1,
+                    "rule": "e2e-test-placeholder",
+                    "message": f"E2E test '{path.name}' appears to contain placeholder content.",
+                }
+            )
+
+    for family, has_assertion in family_has_assertion.items():
+        if not has_assertion:
+            findings.append(
+                {
+                    "severity": TIER_1,
+                    "rule": "e2e-test-family-empty",
+                    "message": f"E2E family '{family}' has no test file with assertions.",
+                }
+            )
+    return findings
+
+
+def _match_plan_tier(plan_path: Path, policy: Dict[str, Any]) -> Dict[str, Any] | None:
+    lower_name = plan_path.name.lower()
+    for tier in (policy.get("plan_tiers") or {}).values():
+        match_fn = str(tier.get("match_filename", "")).lower()
+        if match_fn and match_fn in lower_name:
+            return tier
+    return None
+
+
+def _split_frontmatter(markdown: str) -> tuple[Dict[str, Any], str]:
+    if markdown.startswith("\ufeff"):
+        markdown = markdown[1:]
+    if not markdown.startswith("---\n"):
+        return {}, markdown
+    match = re.match(r"\A---\n(.*?)\n---\n?", markdown, flags=re.DOTALL)
+    if not match:
+        return {}, markdown
+    raw_frontmatter = match.group(1)
+    try:
+        parsed = yaml.safe_load(raw_frontmatter)
+    except yaml.YAMLError:
+        return {}, markdown
+    if not isinstance(parsed, dict):
+        return {}, markdown
+    body = markdown[match.end() :]
+    return parsed, body
+
+
+def _plan_has_work_class_frontmatter(path: Path) -> bool:
+    try:
+        content = path.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return False
+    frontmatter, _ = _split_frontmatter(content)
+    raw_work_class = frontmatter.get("work_class")
+    return isinstance(raw_work_class, str) and bool(raw_work_class.strip())
+
+
+def _policy_work_class_entry(policy: Dict[str, Any], work_class: str) -> Dict[str, Any] | None:
+    work_classes = policy.get("work_classes")
+    if not isinstance(work_classes, dict):
+        return None
+    entry = work_classes.get(work_class)
+    if isinstance(entry, dict):
+        return entry
+    return None
+
+
+def _legacy_tier_for_work_class(policy: Dict[str, Any], work_class: str) -> Dict[str, Any] | None:
+    plan_tiers = policy.get("plan_tiers")
+    if not isinstance(plan_tiers, dict):
+        return None
+
+    direct = plan_tiers.get(work_class)
+    if isinstance(direct, dict):
+        return direct
+
+    if work_class == "feature":
+        system_tier = plan_tiers.get("system")
+        if isinstance(system_tier, dict):
+            return system_tier
+
+    legacy_map = policy.get("legacy_plan_filename_work_class")
+    if not isinstance(legacy_map, dict):
+        return None
+
+    expected_matches = [
+        match_filename.lower()
+        for match_filename, mapped_work_class in legacy_map.items()
+        if isinstance(match_filename, str)
+        and isinstance(mapped_work_class, str)
+        and mapped_work_class.strip().lower() == work_class
+    ]
+    if not expected_matches:
+        return None
+
+    for tier_entry in plan_tiers.values():
+        if not isinstance(tier_entry, dict):
+            continue
+        match_filename = str(tier_entry.get("match_filename", "")).lower()
+        if any(expected_match in match_filename for expected_match in expected_matches):
+            return tier_entry
+    return None
+
+
+def _resolve_legacy_work_class(plan_path: Path, policy: Dict[str, Any]) -> str | None:
+    lower_name = plan_path.name.lower()
+    legacy_map = policy.get("legacy_plan_filename_work_class")
+    if isinstance(legacy_map, dict):
+        for match_filename, work_class in legacy_map.items():
+            if not isinstance(match_filename, str) or not isinstance(work_class, str):
+                continue
+            if match_filename.lower() in lower_name:
+                return work_class.strip().lower()
+
+    plan_tiers = policy.get("plan_tiers")
+    if isinstance(plan_tiers, dict):
+        for tier_name, tier in plan_tiers.items():
+            if not isinstance(tier_name, str) or not isinstance(tier, dict):
+                continue
+            match_filename = str(tier.get("match_filename", "")).lower()
+            if match_filename and match_filename in lower_name:
+                return tier_name.strip().lower()
+
+    return None
+
+
+def _resolve_plan_policy_entry(plan_path: Path, policy: Dict[str, Any]) -> tuple[Dict[str, Any] | None, str | None]:
+    content = plan_path.read_text(encoding="utf-8")
+    frontmatter, _ = _split_frontmatter(content)
+    raw_work_class = frontmatter.get("work_class")
+    legacy_work_class = _resolve_legacy_work_class(plan_path, policy)
+
+    if legacy_work_class:
+        if raw_work_class is not None:
+            if isinstance(raw_work_class, str):
+                parsed_work_class = raw_work_class.strip().lower()
+                if parsed_work_class and parsed_work_class != legacy_work_class:
+                    sys.stderr.write(
+                        f"[itx-gates] Warning: ignoring work_class '{raw_work_class}' in {plan_path}; "
+                        f"legacy filename routing requires '{legacy_work_class}'.\n"
+                    )
+            else:
+                sys.stderr.write(
+                    f"[itx-gates] Warning: invalid non-string work_class in {plan_path}; using legacy filename fallback.\n"
+                )
+
+        entry = _policy_work_class_entry(policy, legacy_work_class)
+        if entry is not None:
+            return entry, legacy_work_class
+
+        tier = _match_plan_tier(plan_path, policy)
+        if tier is not None:
+            return tier, None
+
+        return None, None
+
+    if raw_work_class is not None:
+        if isinstance(raw_work_class, str):
+            parsed_work_class = raw_work_class.strip().lower()
+            entry = _policy_work_class_entry(policy, parsed_work_class)
+            if entry is not None:
+                return entry, parsed_work_class
+            work_classes = policy.get("work_classes")
+            if not isinstance(work_classes, dict):
+                tier = _legacy_tier_for_work_class(policy, parsed_work_class)
+                if tier is not None:
+                    return tier, parsed_work_class
+            sys.stderr.write(
+                f"[itx-gates] Warning: unknown work_class '{raw_work_class}' in {plan_path}; using legacy filename fallback.\n"
+            )
+        else:
+            sys.stderr.write(
+                f"[itx-gates] Warning: invalid non-string work_class in {plan_path}; using legacy filename fallback.\n"
+            )
+
+    tier = _match_plan_tier(plan_path, policy)
+    if tier is not None:
+        return tier, None
+
+    return None, None
+
+
+def _entry_requires_tasks(policy_entry: Mapping[str, Any]) -> bool:
+    task_policy = policy_entry.get("task_policy")
+    if isinstance(task_policy, str):
+        return task_policy.strip().lower() == "required"
+    return True
+
+
+def _load_active_feature_from_workflow_state(workspace: Path) -> str | None:
+    state_path = workspace / ".specify" / "context" / "workflow-state.yml"
+    if not state_path.exists():
+        return None
+    try:
+        data = yaml.safe_load(state_path.read_text(encoding="utf-8"))
+    except (yaml.YAMLError, OSError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    feature = data.get("feature")
+    if not isinstance(feature, str):
+        return None
+    normalized = feature.strip()
+    return normalized or None
+
+
+def _plan_files_for_task_policy_resolution(workspace: Path) -> List[Path]:
+    all_plan_files = _find_plan_files(workspace)
+    if not all_plan_files:
+        return []
+
+    active_feature = _load_active_feature_from_workflow_state(workspace)
+    if not active_feature:
+        return all_plan_files
+
+    feature_root = workspace / "specs" / active_feature
+    scoped: List[Path] = []
+    for plan_file in all_plan_files:
+        try:
+            plan_file.relative_to(feature_root)
+        except ValueError:
+            continue
+        scoped.append(plan_file)
+    return scoped or all_plan_files
+
+
+def _task_files_for_review_scope(workspace: Path, task_files: Sequence[Path]) -> List[Path]:
+    active_feature = _load_active_feature_from_workflow_state(workspace)
+    if not active_feature:
+        return list(task_files)
+
+    feature_root = workspace / "specs" / active_feature
+    scoped: List[Path] = []
+    for task_file in task_files:
+        try:
+            rel = task_file.relative_to(workspace)
+        except ValueError:
+            continue
+        if rel.parts and rel.parts[0] == ".specify":
+            scoped.append(task_file)
+            continue
+        if rel == Path("tasks.md"):
+            scoped.append(task_file)
+            continue
+        try:
+            task_file.relative_to(feature_root)
+        except ValueError:
+            continue
+        scoped.append(task_file)
+    return scoped
+
+
+def _task_files_for_execution_brief_scope(workspace: Path, task_files: Sequence[Path], plan_path: Path) -> List[Path]:
+    active_feature = _load_active_feature_from_workflow_state(workspace)
+    if active_feature:
+        return _task_files_for_review_scope(workspace, task_files)
+
+    try:
+        plan_rel = plan_path.relative_to(workspace)
+    except ValueError:
+        return []
+    if len(plan_rel.parts) < 3 or plan_rel.parts[0] != "specs":
+        return []
+
+    feature_root = workspace / "specs" / plan_rel.parts[1]
+    scoped: List[Path] = []
+    for task_file in task_files:
+        try:
+            task_file.relative_to(feature_root)
+        except ValueError:
+            continue
+        scoped.append(task_file)
+    return scoped
+
+
+def _tasks_required_for_workspace(workspace: Path, policy: Dict[str, Any]) -> bool:
+    plan_files = _plan_files_for_task_policy_resolution(workspace)
+    if not plan_files:
+        return True
+
+    resolved_entries: List[Mapping[str, Any]] = []
+    for plan_file in plan_files:
+        policy_entry, _ = _resolve_plan_policy_entry(plan_file, policy)
+        if policy_entry is not None:
+            resolved_entries.append(policy_entry)
+
+    if not resolved_entries:
+        return True
+
+    return any(_entry_requires_tasks(entry) for entry in resolved_entries)
+
+
+def _validate_plan_content(plan_path: Path, policy: Dict[str, Any]) -> List[Finding]:
+    findings: List[Finding] = []
+    content = plan_path.read_text(encoding="utf-8")
+
+    frontmatter, _ = _split_frontmatter(content)
+    raw_work_class = frontmatter.get("work_class")
+    policy_entry, _ = _resolve_plan_policy_entry(plan_path, policy)
+    if policy_entry is None:
+        if _resolve_legacy_work_class(plan_path, policy) is None:
+            if raw_work_class is None:
+                findings.append(
+                    {
+                        "severity": TIER_1,
+                        "rule": "plan-work-class-missing",
+                        "message": (
+                            f"Plan '{plan_path.name}' is missing required frontmatter work_class. "
+                            "Declare a work_class from policy.work_classes or use a legacy plan filename."
+                        ),
+                    }
+                )
+            else:
+                findings.append(
+                    {
+                        "severity": TIER_1,
+                        "rule": "plan-work-class-unresolved",
+                        "message": (
+                            f"Unable to resolve work_class '{raw_work_class}' for {plan_path.name}. "
+                            "Declare a known work_class from policy.work_classes or use a legacy plan filename."
+                        ),
+                    }
+                )
+        return findings
+
+    mandatory_headings: List[str] = policy_entry.get("mandatory_sections") or []
+    placeholder_markers: List[str] = policy.get("placeholder_markers") or []
+    sections = _extract_markdown_h2_sections(content)
+
+    for heading in mandatory_headings:
+        section_body = sections.get(heading)
+        if section_body is None:
+            findings.append(
+                {
+                    "severity": TIER_1,
+                    "rule": "plan-section-missing",
+                    "message": f"Plan is missing mandatory section: '{heading}' in {plan_path.name}",
+                }
+            )
+            continue
+
+        content_lines = [
+            line for line in section_body.splitlines() if line.strip() and not line.strip().startswith("|--") and not line.strip().startswith("> ")
+        ]
+        real_content = [line for line in content_lines if not any(marker in line for marker in placeholder_markers)]
+
+        if not real_content:
+            findings.append(
+                {
+                    "severity": TIER_1,
+                    "rule": "plan-section-placeholder",
+                    "message": f"Section '{heading}' in {plan_path.name} contains only placeholder text — fill it with actual design decisions.",
+                }
+            )
+
+    return findings
