@@ -407,6 +407,637 @@ class OrchestratorTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0)
             self.assertIn("Gates passed", result.stdout)
 
+    def test_after_plan_legacy_filename_wins_over_conflicting_work_class(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-b").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-b" / "system-design-plan.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: patch",
+                        "---",
+                        "# Plan",
+                        "## 1. Problem Statement",
+                        "Apply a scoped non-feature change",
+                        "## 2. Files / Modules Affected",
+                        "- src/service.py",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            feedback = ws / ".specify" / "context" / "gate_feedback.md"
+            self.assertTrue(feedback.exists())
+            self.assertIn("plan-section-missing", feedback.read_text(encoding="utf-8"))
+            self.assertIn("ignoring work_class", result.stderr)
+
+    def test_after_plan_unknown_work_class_falls_back_to_filename_rules(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-b").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-b" / "patch-plan.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: does-not-exist",
+                        "---",
+                        "# Patch plan",
+                        "## 1. Problem Statement",
+                        "Fix a scoped issue",
+                        "## 2. Files / Modules Affected",
+                        "- src/service.py",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("ignoring work_class", result.stderr)
+            self.assertIn("Gates passed", result.stdout)
+
+    def test_after_plan_legacy_policy_without_work_classes_still_works_without_frontmatter(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            (ws / ".specify").mkdir(parents=True, exist_ok=True)
+            (ws / ".specify" / "policy.yml").write_text(
+                "\n".join(
+                    [
+                        "plan_tiers:",
+                        "  system:",
+                        "    match_filename: system-design-plan",
+                        "    mandatory_sections:",
+                        "      - '## 4. Architectural Patterns Applied'",
+                        "      - '## 4b. Code-Level Design Patterns Applied'",
+                        "      - '## 5. DDD Aggregates'",
+                        "      - '## 13. Test Strategy'",
+                        "    pattern_selection: required",
+                        "  patch:",
+                        "    match_filename: patch-plan",
+                        "    mandatory_sections:",
+                        "      - '## 1. Problem Statement'",
+                        "      - '## 2. Files / Modules Affected'",
+                        "    pattern_selection: optional",
+                        "placeholder_markers:",
+                        "  - '_e.g.,'",
+                        "  - 'e.g.,'",
+                        "  - 'MANDATORY'",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (ws / "specs" / "feature-a").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-a" / "system-design-plan.md").write_text(
+                "\n".join(
+                    [
+                        "# Plan",
+                        "## 4. Architectural Patterns Applied",
+                        "- DDD + Hexagonal",
+                        "## 4b. Code-Level Design Patterns Applied",
+                        "- Strategy + Command",
+                        "## 5. DDD Aggregates",
+                        "- Account aggregate",
+                        "## 13. Test Strategy",
+                        "- E2E journey coverage",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (ws / "specs" / "feature-a" / "patch-plan.md").write_text(
+                "\n".join(
+                    [
+                        "# Patch plan",
+                        "## 1. Problem Statement",
+                        "Fix a scoped issue",
+                        "## 2. Files / Modules Affected",
+                        "- src/service.py",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Gates passed", result.stdout)
+
+    def test_after_plan_non_legacy_work_class_uses_legacy_policy_mapping(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            (ws / ".specify").mkdir(parents=True, exist_ok=True)
+            (ws / ".specify" / "policy.yml").write_text(
+                "\n".join(
+                    [
+                        "plan_tiers:",
+                        "  system:",
+                        "    match_filename: system-design-plan",
+                        "    mandatory_sections:",
+                        "      - '## 4. Architectural Patterns Applied'",
+                        "      - '## 4b. Code-Level Design Patterns Applied'",
+                        "      - '## 5. DDD Aggregates'",
+                        "      - '## 13. Test Strategy'",
+                        "    pattern_selection: required",
+                        "  patch:",
+                        "    match_filename: patch-plan",
+                        "    mandatory_sections:",
+                        "      - '## 1. Problem Statement'",
+                        "      - '## 2. Files / Modules Affected'",
+                        "    pattern_selection: optional",
+                        "placeholder_markers:",
+                        "  - '_e.g.,'",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (ws / "specs" / "feature-a").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-a" / "refactor-plan.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: patch",
+                        "---",
+                        "# Refactor plan",
+                        "## 1. Problem Statement",
+                        "Fix a scoped issue",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            feedback = ws / ".specify" / "context" / "gate_feedback.md"
+            self.assertTrue(feedback.exists())
+            self.assertIn("plan-section-missing", feedback.read_text(encoding="utf-8"))
+
+    def test_after_plan_non_legacy_feature_work_class_uses_legacy_policy_mapping(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            (ws / ".specify").mkdir(parents=True, exist_ok=True)
+            (ws / ".specify" / "policy.yml").write_text(
+                "\n".join(
+                    [
+                        "plan_tiers:",
+                        "  system:",
+                        "    match_filename: system-design-plan",
+                        "    mandatory_sections:",
+                        "      - '## 4. Architectural Patterns Applied'",
+                        "      - '## 4b. Code-Level Design Patterns Applied'",
+                        "      - '## 5. DDD Aggregates'",
+                        "      - '## 13. Test Strategy'",
+                        "    pattern_selection: required",
+                        "  patch:",
+                        "    match_filename: patch-plan",
+                        "    mandatory_sections:",
+                        "      - '## 1. Problem Statement'",
+                        "      - '## 2. Files / Modules Affected'",
+                        "    pattern_selection: optional",
+                        "placeholder_markers:",
+                        "  - '_e.g.,'",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (ws / "specs" / "feature-a").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-a" / "refactor-plan.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: feature",
+                        "---",
+                        "# Refactor plan",
+                        "## 4. Architectural Patterns Applied",
+                        "- DDD and Hexagonal Architecture",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            feedback = ws / ".specify" / "context" / "gate_feedback.md"
+            self.assertTrue(feedback.exists())
+            text = feedback.read_text(encoding="utf-8")
+            self.assertIn("plan-section-missing", text)
+            self.assertNotIn("plan-work-class-unresolved", text)
+
+    def test_after_plan_non_legacy_name_with_work_class_is_discovered(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-c").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-c" / "refactor-plan.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: patch",
+                        "---",
+                        "# Refactor plan",
+                        "## 1. Problem Statement",
+                        "Refactor internals without changing behavior",
+                        "## 2. Files / Modules Affected",
+                        "- src/refactor_target.py",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Gates passed", result.stdout)
+
+    def test_after_plan_bugfix_report_with_work_class_is_discovered(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-c").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-c" / "bugfix-report.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: patch",
+                        "---",
+                        "# Bugfix report",
+                        "## 1. Problem Statement",
+                        "Fix a regression introduced in the last release",
+                        "## 2. Files / Modules Affected",
+                        "- src/service.py",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Gates passed", result.stdout)
+            feedback = ws / ".specify" / "context" / "gate_feedback.md"
+            if feedback.exists():
+                self.assertNotIn("plan-presence", feedback.read_text(encoding="utf-8"))
+
+    def test_after_plan_bugfix_report_with_work_class_uses_legacy_plan_tiers_policy(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            (ws / ".specify").mkdir(parents=True, exist_ok=True)
+            (ws / ".specify" / "policy.yml").write_text(
+                "\n".join(
+                    [
+                        "plan_tiers:",
+                        "  system:",
+                        "    match_filename: system-design-plan",
+                        "    mandatory_sections:",
+                        "      - '## 4. Architectural Patterns Applied'",
+                        "      - '## 4b. Code-Level Design Patterns Applied'",
+                        "      - '## 5. DDD Aggregates'",
+                        "      - '## 13. Test Strategy'",
+                        "    pattern_selection: required",
+                        "  patch:",
+                        "    match_filename: patch-plan",
+                        "    mandatory_sections:",
+                        "      - '## 1. Problem Statement'",
+                        "      - '## 2. Files / Modules Affected'",
+                        "    pattern_selection: optional",
+                        "placeholder_markers:",
+                        "  - '_e.g.,'",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (ws / "specs" / "feature-c").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-c" / "bugfix-report.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: patch",
+                        "---",
+                        "# Bugfix report",
+                        "## 1. Problem Statement",
+                        "Fix a regression introduced in the last release",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            feedback = ws / ".specify" / "context" / "gate_feedback.md"
+            self.assertTrue(feedback.exists())
+            text = feedback.read_text(encoding="utf-8")
+            self.assertIn("plan-section-missing", text)
+            self.assertNotIn("plan-work-class-unresolved", text)
+
+    def test_after_plan_migration_plan_with_work_class_is_discovered(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-d").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-d" / "migration-plan.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: migration",
+                        "---",
+                        "# Migration plan",
+                        "## 4. Architectural Patterns Applied",
+                        "- Incremental migration with bounded-context boundaries",
+                        "## 4b. Code-Level Design Patterns Applied",
+                        "- Adapter + anti-corruption layer",
+                        "## 5. DDD Aggregates",
+                        "- Account aggregate remains source of truth",
+                        "## 13. Test Strategy",
+                        "- E2E and rollback validation",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Gates passed", result.stdout)
+            feedback = ws / ".specify" / "context" / "gate_feedback.md"
+            if feedback.exists():
+                self.assertNotIn("plan-presence", feedback.read_text(encoding="utf-8"))
+
+    def test_after_plan_spike_note_with_work_class_is_discovered(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-e").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-e" / "spike-note.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: spike",
+                        "---",
+                        "# Spike note",
+                        "## 1. Problem Statement",
+                        "Evaluate two candidate storage engines under current constraints",
+                        "## 2. Files / Modules Affected",
+                        "- docs/spike-notes/storage-options.md",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Gates passed", result.stdout)
+            feedback = ws / ".specify" / "context" / "gate_feedback.md"
+            if feedback.exists():
+                self.assertNotIn("plan-presence", feedback.read_text(encoding="utf-8"))
+
+    def test_after_plan_tooling_plan_with_work_class_is_discovered(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-f").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-f" / "tooling-plan.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: tooling",
+                        "---",
+                        "# Tooling plan",
+                        "## 1. Problem Statement",
+                        "Improve local lint execution stability",
+                        "## 2. Files / Modules Affected",
+                        "- scripts/lint.sh",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Gates passed", result.stdout)
+            feedback = ws / ".specify" / "context" / "gate_feedback.md"
+            if feedback.exists():
+                self.assertNotIn("plan-presence", feedback.read_text(encoding="utf-8"))
+
+    def test_after_plan_non_legacy_name_without_frontmatter_is_tier1_missing_work_class(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-c").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-c" / "refactor-plan.md").write_text(
+                "\n".join(
+                    [
+                        "# Refactor plan",
+                        "## Notes",
+                        "- Internal cleanup, no explicit work_class metadata",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            feedback = ws / ".specify" / "context" / "gate_feedback.md"
+            self.assertTrue(feedback.exists())
+            text = feedback.read_text(encoding="utf-8")
+            self.assertIn("plan-work-class-missing", text)
+            self.assertNotIn("plan-presence", text)
+
+    def test_after_plan_ignores_auxiliary_plan_docs_under_specs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-c").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-c" / "notes-plan.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: feature",
+                        "---",
+                        "# Notes plan",
+                        "This is a sidecar design note and must not be gated as a first-class plan artifact.",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            feedback = ws / ".specify" / "context" / "gate_feedback.md"
+            self.assertTrue(feedback.exists())
+            text = feedback.read_text(encoding="utf-8")
+            self.assertIn("plan-presence", text)
+            self.assertNotIn("plan-section-missing", text)
+
+    def test_after_plan_valid_legacy_plan_with_auxiliary_metadata_plan_stays_green(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-c").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-c" / "system-design-plan.md").write_text(
+                "\n".join(
+                    [
+                        "# Plan",
+                        "## 4. Architectural Patterns Applied",
+                        "- Domain-Driven Design with explicit bounded contexts",
+                        "## 4b. Code-Level Design Patterns Applied",
+                        "- Command + Handler and Value Objects are required for this feature",
+                        "## 5. DDD Aggregates",
+                        "- Order aggregate with transition invariants",
+                        "## 13. Test Strategy",
+                        "- E2E: place order journey with DB + event assertions",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (ws / "specs" / "feature-c" / "rollback-plan.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: feature",
+                        "---",
+                        "# Rollback notes",
+                        "Auxiliary documentation that should be ignored by after_plan.",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Gates passed", result.stdout)
+            feedback = ws / ".specify" / "context" / "gate_feedback.md"
+            if feedback.exists():
+                self.assertNotIn("plan-section-missing", feedback.read_text(encoding="utf-8"))
+
+    def test_after_plan_non_legacy_blank_work_class_emits_unresolved(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-c").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-c" / "refactor-plan.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: '   '",
+                        "---",
+                        "# Refactor plan",
+                        "## Notes",
+                        "- Internal cleanup",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            feedback = ws / ".specify" / "context" / "gate_feedback.md"
+            self.assertTrue(feedback.exists())
+            text = feedback.read_text(encoding="utf-8")
+            self.assertIn("plan-work-class-unresolved", text)
+            self.assertNotIn("plan-presence", text)
+
+    def test_after_plan_non_legacy_non_string_work_class_emits_unresolved(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-c").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-c" / "refactor-plan.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class:",
+                        "  - patch",
+                        "---",
+                        "# Refactor plan",
+                        "## Notes",
+                        "- Internal cleanup",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            feedback = ws / ".specify" / "context" / "gate_feedback.md"
+            self.assertTrue(feedback.exists())
+            text = feedback.read_text(encoding="utf-8")
+            self.assertIn("plan-work-class-unresolved", text)
+            self.assertNotIn("plan-presence", text)
+
+    def test_after_plan_non_legacy_bom_prefixed_frontmatter_is_discovered(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-c").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-c" / "refactor-plan.md").write_text(
+                "\ufeff"
+                + "\n".join(
+                    [
+                        "---",
+                        "work_class: patch",
+                        "---",
+                        "# Refactor plan",
+                        "## 1. Problem Statement",
+                        "Refactor internals without changing behavior",
+                        "## 2. Files / Modules Affected",
+                        "- src/refactor_target.py",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Gates passed", result.stdout)
+
+    def test_after_plan_non_legacy_unknown_work_class_emits_tier1_finding(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-c").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-c" / "refactor-plan.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: does-not-exist",
+                        "---",
+                        "# Refactor plan",
+                        "## 1. Problem Statement",
+                        "Refactor internals without changing behavior",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            feedback = ws / ".specify" / "context" / "gate_feedback.md"
+            self.assertTrue(feedback.exists())
+            self.assertIn("plan-work-class-unresolved", feedback.read_text(encoding="utf-8"))
+
     def test_after_plan_does_not_run_domain_checks(self):
         with tempfile.TemporaryDirectory() as tmp:
             ws = Path(tmp)
@@ -492,6 +1123,63 @@ class OrchestratorTests(unittest.TestCase):
             feedback = ws / ".specify" / "context" / "gate_feedback.md"
             self.assertTrue(feedback.exists())
             self.assertIn("knowledge-pattern-selection-missing", feedback.read_text(encoding="utf-8"))
+
+    def test_after_plan_lazy_mode_non_legacy_feature_work_class_requires_selection(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base", knowledge_mode="lazy")
+            write_policy(ws)
+            (ws / "specs" / "feature-c").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-c" / "refactor-plan.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: feature",
+                        "---",
+                        "# Refactor plan",
+                        "## 4. Architectural Patterns Applied",
+                        "- Domain-driven architecture selected",
+                        "## 4b. Code-Level Design Patterns Applied",
+                        "- command + handler",
+                        "## 5. DDD Aggregates",
+                        "- Order",
+                        "## 13. Test Strategy",
+                        "- E2E flow for order lifecycle",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            feedback = ws / ".specify" / "context" / "gate_feedback.md"
+            self.assertTrue(feedback.exists())
+            self.assertIn("knowledge-pattern-selection-missing", feedback.read_text(encoding="utf-8"))
+
+    def test_after_plan_lazy_mode_non_legacy_without_work_class_is_tier1_missing_work_class(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base", knowledge_mode="lazy")
+            write_policy(ws)
+            (ws / "specs" / "feature-c").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-c" / "refactor-plan.md").write_text(
+                "\n".join(
+                    [
+                        "# Refactor plan",
+                        "## Notes",
+                        "- Internal cleanup, no explicit work_class metadata",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            feedback = ws / ".specify" / "context" / "gate_feedback.md"
+            self.assertTrue(feedback.exists())
+            text = feedback.read_text(encoding="utf-8")
+            self.assertIn("plan-work-class-missing", text)
+            self.assertNotIn("knowledge-pattern-selection-missing", text)
 
     def test_after_plan_lazy_mode_patch_plan_none_selection_passes(self):
         """Patch plans with explicit 'none' selection should not trigger findings."""
@@ -642,6 +1330,28 @@ class OrchestratorTests(unittest.TestCase):
             result = self.run_gate(ws, "after_plan")
             self.assertEqual(result.returncode, 0)
             self.assertIn("deprecated inline markdown filename fallback", result.stderr)
+
+    def test_base_policy_wave_a_work_classes_contract_shape(self):
+        policy_path = ROOT / "presets" / "base" / "policy.yml"
+        data = yaml.safe_load(policy_path.read_text(encoding="utf-8"))
+        self.assertIsInstance(data, dict)
+        work_classes = data.get("work_classes")
+        self.assertIsInstance(work_classes, dict)
+        expected_classes = {"feature", "patch", "refactor", "bugfix", "migration", "tooling", "spike"}
+        self.assertTrue(expected_classes.issubset(set(work_classes.keys())))
+
+        required_fields = {
+            "allowed_templates",
+            "mandatory_sections",
+            "pattern_selection",
+            "task_policy",
+            "testing_expectation",
+            "gate_profile",
+        }
+        for work_class in expected_classes:
+            entry = work_classes.get(work_class)
+            self.assertIsInstance(entry, dict)
+            self.assertTrue(required_fields.issubset(set(entry.keys())))
 
     def test_after_tasks_does_not_run_domain_checks(self):
         with tempfile.TemporaryDirectory() as tmp:

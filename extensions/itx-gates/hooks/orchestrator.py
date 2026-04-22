@@ -33,6 +33,93 @@ DOMAIN_VALIDATORS: Dict[str, str] = {
 
 # Inline fallback used when policy.yml is not available in the workspace.
 _DEFAULT_POLICY: Dict[str, Any] = {
+    "work_classes": {
+        "feature": {
+            "allowed_templates": ["system-design-plan-template.md"],
+            "mandatory_sections": [
+                "## 4. Architectural Patterns Applied",
+                "## 4b. Code-Level Design Patterns Applied",
+                "## 5. DDD Aggregates",
+                "## 13. Test Strategy",
+            ],
+            "pattern_selection": "required",
+            "task_policy": "required",
+            "testing_expectation": "e2e-required",
+            "gate_profile": "feature-strict",
+        },
+        "patch": {
+            "allowed_templates": ["patch-plan-template.md"],
+            "mandatory_sections": [
+                "## 1. Problem Statement",
+                "## 2. Files / Modules Affected",
+            ],
+            "pattern_selection": "optional",
+            "task_policy": "required",
+            "testing_expectation": "regression-required",
+            "gate_profile": "patch-safe",
+        },
+        "refactor": {
+            "allowed_templates": ["patch-plan-template.md"],
+            "mandatory_sections": [
+                "## 1. Problem Statement",
+                "## 2. Files / Modules Affected",
+            ],
+            "pattern_selection": "optional",
+            "task_policy": "required",
+            "testing_expectation": "regression-required",
+            "gate_profile": "patch-safe",
+        },
+        "bugfix": {
+            "allowed_templates": ["patch-plan-template.md"],
+            "mandatory_sections": [
+                "## 1. Problem Statement",
+                "## 2. Files / Modules Affected",
+            ],
+            "pattern_selection": "optional",
+            "task_policy": "required",
+            "testing_expectation": "regression-required",
+            "gate_profile": "patch-safe",
+        },
+        "migration": {
+            "allowed_templates": ["system-design-plan-template.md", "patch-plan-template.md"],
+            "mandatory_sections": [
+                "## 4. Architectural Patterns Applied",
+                "## 4b. Code-Level Design Patterns Applied",
+                "## 5. DDD Aggregates",
+                "## 13. Test Strategy",
+            ],
+            "pattern_selection": "required",
+            "task_policy": "required",
+            "testing_expectation": "e2e-required",
+            "gate_profile": "feature-strict",
+        },
+        "tooling": {
+            "allowed_templates": ["patch-plan-template.md"],
+            "mandatory_sections": [
+                "## 1. Problem Statement",
+                "## 2. Files / Modules Affected",
+            ],
+            "pattern_selection": "optional",
+            "task_policy": "required",
+            "testing_expectation": "regression-required",
+            "gate_profile": "patch-safe",
+        },
+        "spike": {
+            "allowed_templates": ["patch-plan-template.md"],
+            "mandatory_sections": [
+                "## 1. Problem Statement",
+                "## 2. Files / Modules Affected",
+            ],
+            "pattern_selection": "optional",
+            "task_policy": "optional",
+            "testing_expectation": "advisory",
+            "gate_profile": "spike-light",
+        },
+    },
+    "legacy_plan_filename_work_class": {
+        "system-design-plan": "feature",
+        "patch-plan": "patch",
+    },
     "plan_tiers": {
         "system": {
             "match_filename": "system-design-plan",
@@ -406,8 +493,18 @@ def _find_plan_files(workspace: Path) -> List[Path]:
     candidates = [
         workspace.glob("specs/**/system-design-plan*.md"),
         workspace.glob("specs/**/patch-plan*.md"),
+        workspace.glob("specs/**/refactor-plan*.md"),
+        workspace.glob("specs/**/bugfix-report*.md"),
+        workspace.glob("specs/**/migration-plan*.md"),
+        workspace.glob("specs/**/tooling-plan*.md"),
+        workspace.glob("specs/**/spike-note*.md"),
         workspace.glob("system-design-plan*.md"),
         workspace.glob("patch-plan*.md"),
+        workspace.glob("refactor-plan*.md"),
+        workspace.glob("bugfix-report*.md"),
+        workspace.glob("migration-plan*.md"),
+        workspace.glob("tooling-plan*.md"),
+        workspace.glob("spike-note*.md"),
     ]
     seen: set[Path] = set()
     results: List[Path] = []
@@ -644,16 +741,200 @@ def _match_plan_tier(plan_path: Path, policy: Dict[str, Any]) -> Dict[str, Any] 
     return None
 
 
+def _split_frontmatter(markdown: str) -> tuple[Dict[str, Any], str]:
+    if markdown.startswith("\ufeff"):
+        markdown = markdown[1:]
+    if not markdown.startswith("---\n"):
+        return {}, markdown
+    match = re.match(r"\A---\n(.*?)\n---\n?", markdown, flags=re.DOTALL)
+    if not match:
+        return {}, markdown
+    raw_frontmatter = match.group(1)
+    try:
+        parsed = yaml.safe_load(raw_frontmatter)
+    except yaml.YAMLError:
+        return {}, markdown
+    if not isinstance(parsed, dict):
+        return {}, markdown
+    body = markdown[match.end() :]
+    return parsed, body
+
+
+def _plan_has_work_class_frontmatter(path: Path) -> bool:
+    try:
+        content = path.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return False
+    frontmatter, _ = _split_frontmatter(content)
+    raw_work_class = frontmatter.get("work_class")
+    return isinstance(raw_work_class, str) and bool(raw_work_class.strip())
+
+
+def _policy_work_class_entry(policy: Dict[str, Any], work_class: str) -> Dict[str, Any] | None:
+    work_classes = policy.get("work_classes")
+    if not isinstance(work_classes, dict):
+        return None
+    entry = work_classes.get(work_class)
+    if isinstance(entry, dict):
+        return entry
+    return None
+
+
+def _legacy_tier_for_work_class(policy: Dict[str, Any], work_class: str) -> Dict[str, Any] | None:
+    """Resolve legacy plan_tiers entry by work_class for plan_tiers-only policies."""
+    plan_tiers = policy.get("plan_tiers")
+    if not isinstance(plan_tiers, dict):
+        return None
+
+    direct = plan_tiers.get(work_class)
+    if isinstance(direct, dict):
+        return direct
+
+    # Backward compatibility for pre-Wave-A policies that use plan_tiers.system/patch keys.
+    if work_class == "feature":
+        system_tier = plan_tiers.get("system")
+        if isinstance(system_tier, dict):
+            return system_tier
+
+    legacy_map = policy.get("legacy_plan_filename_work_class")
+    if not isinstance(legacy_map, dict):
+        return None
+
+    expected_matches = [
+        match_filename.lower()
+        for match_filename, mapped_work_class in legacy_map.items()
+        if isinstance(match_filename, str)
+        and isinstance(mapped_work_class, str)
+        and mapped_work_class.strip().lower() == work_class
+    ]
+    if not expected_matches:
+        return None
+
+    for tier_entry in plan_tiers.values():
+        if not isinstance(tier_entry, dict):
+            continue
+        match_filename = str(tier_entry.get("match_filename", "")).lower()
+        if any(expected_match in match_filename for expected_match in expected_matches):
+            return tier_entry
+    return None
+
+
+def _resolve_legacy_work_class(plan_path: Path, policy: Dict[str, Any]) -> str | None:
+    lower_name = plan_path.name.lower()
+    legacy_map = policy.get("legacy_plan_filename_work_class")
+    if isinstance(legacy_map, dict):
+        for match_filename, work_class in legacy_map.items():
+            if not isinstance(match_filename, str) or not isinstance(work_class, str):
+                continue
+            if match_filename.lower() in lower_name:
+                return work_class.strip().lower()
+
+    plan_tiers = policy.get("plan_tiers")
+    if isinstance(plan_tiers, dict):
+        for tier_name, tier in plan_tiers.items():
+            if not isinstance(tier_name, str) or not isinstance(tier, dict):
+                continue
+            match_filename = str(tier.get("match_filename", "")).lower()
+            if match_filename and match_filename in lower_name:
+                return tier_name.strip().lower()
+
+    return None
+
+
+def _resolve_plan_policy_entry(plan_path: Path, policy: Dict[str, Any]) -> tuple[Dict[str, Any] | None, str | None]:
+    """Resolve the effective plan policy entry and corresponding work_class."""
+    content = plan_path.read_text(encoding="utf-8")
+    frontmatter, _ = _split_frontmatter(content)
+    raw_work_class = frontmatter.get("work_class")
+    legacy_work_class = _resolve_legacy_work_class(plan_path, policy)
+
+    # Preserve legacy filename behavior first for backward compatibility.
+    if legacy_work_class:
+        if raw_work_class is not None:
+            if isinstance(raw_work_class, str):
+                parsed_work_class = raw_work_class.strip().lower()
+                if parsed_work_class and parsed_work_class != legacy_work_class:
+                    sys.stderr.write(
+                        f"[itx-gates] Warning: ignoring work_class '{raw_work_class}' in {plan_path}; "
+                        f"legacy filename routing requires '{legacy_work_class}'.\n"
+                    )
+            else:
+                sys.stderr.write(
+                    f"[itx-gates] Warning: invalid non-string work_class in {plan_path}; using legacy filename fallback.\n"
+                )
+
+        entry = _policy_work_class_entry(policy, legacy_work_class)
+        if entry is not None:
+            return entry, legacy_work_class
+
+        tier = _match_plan_tier(plan_path, policy)
+        if tier is not None:
+            return tier, None
+
+        return None, None
+
+    # Metadata-first path for non-legacy plan filenames.
+    if raw_work_class is not None:
+        if isinstance(raw_work_class, str):
+            parsed_work_class = raw_work_class.strip().lower()
+            entry = _policy_work_class_entry(policy, parsed_work_class)
+            if entry is not None:
+                return entry, parsed_work_class
+            work_classes = policy.get("work_classes")
+            if not isinstance(work_classes, dict):
+                tier = _legacy_tier_for_work_class(policy, parsed_work_class)
+                if tier is not None:
+                    return tier, parsed_work_class
+            sys.stderr.write(
+                f"[itx-gates] Warning: unknown work_class '{raw_work_class}' in {plan_path}; using legacy filename fallback.\n"
+            )
+        else:
+            sys.stderr.write(
+                f"[itx-gates] Warning: invalid non-string work_class in {plan_path}; using legacy filename fallback.\n"
+            )
+
+    tier = _match_plan_tier(plan_path, policy)
+    if tier is not None:
+        return tier, None
+
+    return None, None
+
+
 def _validate_plan_content(plan_path: Path, policy: Dict[str, Any]) -> List[Finding]:
     """Check that mandatory sections exist and are not just template placeholders."""
     findings: List[Finding] = []
     content = plan_path.read_text(encoding="utf-8")
 
-    tier = _match_plan_tier(plan_path, policy)
-    if tier is None:
+    frontmatter, _ = _split_frontmatter(content)
+    raw_work_class = frontmatter.get("work_class")
+    policy_entry, _ = _resolve_plan_policy_entry(plan_path, policy)
+    if policy_entry is None:
+        if _resolve_legacy_work_class(plan_path, policy) is None:
+            if raw_work_class is None:
+                findings.append(
+                    {
+                        "severity": TIER_1,
+                        "rule": "plan-work-class-missing",
+                        "message": (
+                            f"Plan '{plan_path.name}' is missing required frontmatter work_class. "
+                            "Declare a work_class from policy.work_classes or use a legacy plan filename."
+                        ),
+                    }
+                )
+            else:
+                findings.append(
+                    {
+                        "severity": TIER_1,
+                        "rule": "plan-work-class-unresolved",
+                        "message": (
+                            f"Unable to resolve work_class '{raw_work_class}' for {plan_path.name}. "
+                            "Declare a known work_class from policy.work_classes or use a legacy plan filename."
+                        ),
+                    }
+                )
         return findings
 
-    mandatory_headings: List[str] = tier.get("mandatory_sections") or []
+    mandatory_headings: List[str] = policy_entry.get("mandatory_sections") or []
     placeholder_markers: List[str] = policy.get("placeholder_markers") or []
     sections = _extract_markdown_h2_sections(content)
 
@@ -744,8 +1025,8 @@ def _sync_lazy_knowledge(
     used_regex_fallback = False
     for plan_file in plan_files:
         text = plan_file.read_text(encoding="utf-8", errors="ignore")
-        tier = _match_plan_tier(plan_file, policy)
-        selection_mode = str((tier or {}).get("pattern_selection", "required")).lower()
+        policy_entry, _ = _resolve_plan_policy_entry(plan_file, policy)
+        selection_mode = str((policy_entry or {}).get("pattern_selection", "optional")).lower()
 
         selected, fallback_used = _extract_selected_patterns(text, known_names_for_fallback)
         used_regex_fallback = used_regex_fallback or fallback_used
@@ -861,7 +1142,9 @@ def run_generic_checks(
                     "severity": TIER_1,
                     "rule": "plan-presence",
                     "message": (
-                        "No plan file found after plan generation stage. Use either system-design-plan-template.md or patch-plan-template.md."
+                        "No supported plan artifact found after plan generation stage. "
+                        "Expected one of: system-design-plan*.md, patch-plan*.md, refactor-plan*.md, "
+                        "bugfix-report*.md, migration-plan*.md, tooling-plan*.md, spike-note*.md."
                     ),
                 }
             )
