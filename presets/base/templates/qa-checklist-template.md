@@ -26,6 +26,8 @@
 - [ ] Input validation/sanitization is present at trust boundaries.
 - [ ] Query construction avoids injection risks.
 - [ ] Authentication/authorization checks are preserved for protected flows.
+- [ ] OWASP-focused checks are covered for touched trust boundaries (injection, access control, SSRF/XSS where relevant).
+- [ ] Rate-limiting protections are preserved or added for sensitive/public endpoints.
 
 ## 4. Observability
 
@@ -55,6 +57,11 @@
 - [ ] YAGNI: no speculative abstractions.
 - [ ] DRY with nuance: extraction only after repeating patterns emerge.
 - [ ] SOLID: SRP and dependency inversion preserved where needed.
+
+## 8. Review and Cleanup Overlays
+
+- [ ] Review mode remains risk-first (severity-ordered findings) and does not implement new features.
+- [ ] Cleanup mode remains evidence-driven and requests approval before destructive removals/upgrades.
 
 ---
 

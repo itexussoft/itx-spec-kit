@@ -9,6 +9,8 @@
 4. Record assumptions and unresolved risks in project docs.
 4b. Reference `docs/knowledge-base/index.md` for the knowledge base index, including workflow documentation and domain-selection guidance.
 4c. Use progressive loading: read `.specify/context/execution-brief.md` first (when present), then load only files explicitly referenced by the brief. Open control-plane artifacts directly only when blocked, investigating gate feedback, or when a human requests it.
+4d. Treat `.specify/context/execution-brief.md` as the active context snapshot for the current workstream. Do not introduce a second memory-bank lifecycle for this kit.
+4e. Apply targeted micro-overlays only when relevant to the current plan scope: ACL for external integrations, security overlays (auth/secrets, OWASP, rate-limiting) for exposed trust boundaries, and TDD loop guidance for bugfix/refactor/modify-style changes.
 
 ## Architectural Design Requirements
 
@@ -71,3 +73,4 @@ For detailed rationale and examples, see `.specify/patterns/foundational-princip
 27. Create pull requests only after required gates pass and include traceability links (spec, plan, tasks, done report) plus test/gate evidence.
 28. PR merges always require explicit human action. Agents must not auto-merge.
 29. Treat PR review as a feedback loop: apply accepted comments, rerun affected checks, and log unresolved items/assumptions in delivery artifacts.
+30. During review and cleanup phases, keep overlays lightweight and subordinate to existing `/speckit.review.run` and `/speckit.cleanup.run` flows. Do not introduce competing lifecycle commands.

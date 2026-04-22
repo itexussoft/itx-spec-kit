@@ -27,6 +27,17 @@ Use this order during implementation:
 2. Load only artifacts and pattern files referenced by the brief.
 3. Open raw control-plane files (`policy.yml`, `input-contracts.yml`, `gate_feedback.md`, etc.) only when needed for gate investigation, unblock, or explicit human request.
 
+`execution-brief.md` is also the active context snapshot for the current workstream. Keep this lightweight and avoid adding a second memory-bank orchestration model.
+
+## Lightweight micro-overlays
+
+Micro-overlays are additive guidance, not new workflows:
+
+- ACL overlay: apply when plans touch third-party/legacy boundaries; keep vendor models/errors inside adapters.
+- Security overlays: apply selectively for auth/secrets, OWASP trust boundaries, and rate-limiting concerns.
+- TDD overlay: prefer red-green-refactor for bugfix/refactor and modify-style behavior changes.
+- Review/janitor overlays: stay risk-first in review and evidence-driven in cleanup while continuing to use `/speckit.review.run` and `/speckit.cleanup.run`.
+
 ## Task format
 
 `tasks.md` must use markdown checkbox syntax for every task item:

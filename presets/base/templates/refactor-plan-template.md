@@ -43,6 +43,14 @@ _List required regression coverage for changed paths._
 |--------------|-----------|------|
 | | | |
 
+## 6b. Overlay Triggers (Optional)
+
+_Use only when relevant. Keep this lightweight and additive to existing flow._
+
+- ACL trigger: if refactor crosses vendor/legacy boundaries, keep mappings and transport concerns inside adapters (`adapter-anti-corruption.md`).
+- Security micro-overlays: call out auth/secrets, OWASP boundary checks, and rate-limiting concerns when refactor touches exposed interfaces.
+- TDD rule: for behavior-adjacent refactor slices, preserve a red-green-refactor loop with focused failing tests before structural edits.
+
 ---
 
 _Template source: `presets/base/templates/refactor-plan-template.md`_

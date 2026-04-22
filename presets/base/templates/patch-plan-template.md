@@ -33,6 +33,14 @@ needed files. Use `none` if no patterns are required:_
 |---------|----------------|----------------|
 | | | |
 
+## 3b. Overlay Triggers (Optional)
+
+_Use only when relevant. These are lightweight overlays, not new workflow commands._
+
+- ACL trigger: if this patch touches third-party/legacy integrations, include `adapter-anti-corruption.md` in `selected_patterns`.
+- Security micro-overlays: note if auth/secrets, OWASP trust-boundary, or rate-limiting checks are required.
+- TDD trigger (modify path): when changing existing behavior, call out the failing regression/unit test you will write first.
+
 ## 4. Risks and Mitigations (Optional)
 
 _Capture only concrete risks introduced by this patch-level change._

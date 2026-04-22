@@ -489,3 +489,218 @@ class OrchestratorWaveCTests(unittest.TestCase):
             audit_log = ws / ".specify" / "context" / "audit-log.md"
             self.assertTrue(audit_log.exists())
             self.assertIn("package-install-remove", audit_log.read_text(encoding="utf-8"))
+
+    def test_after_plan_addendum_overlays_are_selected_when_relevant(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-addendum").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-addendum" / "patch-plan.md").write_text(
+                "\n".join(
+                    [
+                        "# Patch plan",
+                        "<!-- selected_patterns: adapter-anti-corruption.md -->",
+                        "## 1. Problem Statement",
+                        "Modify existing behavior for a public API endpoint using OAuth token checks and rate limit controls.",
+                        "## 2. Files / Modules Affected",
+                        "- `src/integrations/vendor_client.py`",
+                        "- `src/api/public.py`",
+                        "## 5. Regression Testing",
+                        "- add failing regression test before code change",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            brief = ws / ".specify" / "context" / "execution-brief.md"
+            text = brief.read_text(encoding="utf-8")
+            self.assertIn("## Targeted Micro-Overlays", text)
+            self.assertIn("ACL boundary", text)
+            self.assertIn("Security/auth-secrets", text)
+            self.assertIn("Security/OWASP", text)
+            self.assertIn("Security/rate-limiting", text)
+            self.assertIn("TDD loop", text)
+
+    def test_after_plan_brief_includes_active_context_snapshot(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-context").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-context" / "patch-plan.md").write_text(
+                "\n".join(
+                    [
+                        "# Patch plan",
+                        "## 1. Problem Statement",
+                        "Adjust an internal formatting helper.",
+                        "## 2. Files / Modules Affected",
+                        "- `src/formatting.py`",
+                        "## 5. Regression Testing",
+                        "- add integration regression",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            brief = ws / ".specify" / "context" / "execution-brief.md"
+            text = brief.read_text(encoding="utf-8")
+            self.assertIn("## Active Context", text)
+            self.assertIn("active context snapshot", text)
+
+    def test_after_plan_audit_log_includes_why_and_expected_outcome(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-pkg").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-pkg" / "patch-plan.md").write_text(
+                "\n".join(
+                    [
+                        "# Patch plan",
+                        "## 1. Problem Statement",
+                        "Run pip install httpx to support a new adapter test.",
+                        "## 2. Files / Modules Affected",
+                        "- `requirements-dev.txt`",
+                        "## 5. Regression Testing",
+                        "- adapter regression test",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            audit_log = ws / ".specify" / "context" / "audit-log.md"
+            text = audit_log.read_text(encoding="utf-8")
+            self.assertIn("- Why:", text)
+            self.assertIn("- Expected Outcome:", text)
+
+    def test_after_plan_auth_overlay_not_triggered_by_author_header_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-author-only").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-author-only" / "patch-plan.md").write_text(
+                "\n".join(
+                    [
+                        "# Patch plan",
+                        "## 1. Problem Statement",
+                        "Adjust internal markdown rendering for docs output.",
+                        "## 2. Files / Modules Affected",
+                        "- `src/docs/render.py`",
+                        "## 5. Regression Testing",
+                        "- docs integration regression",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            brief = ws / ".specify" / "context" / "execution-brief.md"
+            text = brief.read_text(encoding="utf-8")
+            self.assertNotIn("Security/auth-secrets", text)
+
+    def test_after_plan_acl_overlay_not_triggered_by_internal_integration_wording(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-internal-integration").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-internal-integration" / "patch-plan.md").write_text(
+                "\n".join(
+                    [
+                        "# Patch plan",
+                        "## 1. Problem Statement",
+                        "Improve integration regression coverage for internal module boundaries.",
+                        "## 2. Files / Modules Affected",
+                        "- `src/internal/integration_runner.py`",
+                        "## 5. Regression Testing",
+                        "- internal integration regression",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            brief = ws / ".specify" / "context" / "execution-brief.md"
+            text = brief.read_text(encoding="utf-8")
+            self.assertNotIn("ACL boundary", text)
+
+    def test_after_plan_structure_only_refactor_does_not_force_tdd_overlay(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-refactor-structure").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-refactor-structure" / "refactor-plan.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: refactor",
+                        "---",
+                        "# Refactor plan",
+                        "## 1. Goal",
+                        "Reshape package layout to improve module ownership.",
+                        "## 2. Scope / Non-Scope",
+                        "- In: module relocation only",
+                        "- Out: behavior changes",
+                        "## 3. Invariants to Preserve",
+                        "- Public behavior unchanged",
+                        "## 4. Public Contract Impact",
+                        "None",
+                        "## 5. Behavioral Equivalence Strategy",
+                        "- Snapshot equivalence checks",
+                        "## 6. Regression Strategy",
+                        "- keep current regression suite green",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            brief = ws / ".specify" / "context" / "execution-brief.md"
+            text = brief.read_text(encoding="utf-8")
+            self.assertNotIn("TDD loop", text)
+
+    def test_after_plan_generic_request_input_query_words_do_not_force_owasp_overlay(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-generic-words").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-generic-words" / "patch-plan.md").write_text(
+                "\n".join(
+                    [
+                        "# Patch plan",
+                        "## 1. Problem Statement",
+                        "Improve internal request parsing and query formatting for analytics input files.",
+                        "## 2. Files / Modules Affected",
+                        "- `src/analytics/parser.py`",
+                        "## 5. Regression Testing",
+                        "- analytics integration regression",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            brief = ws / ".specify" / "context" / "execution-brief.md"
+            text = brief.read_text(encoding="utf-8")
+            self.assertNotIn("Security/OWASP", text)

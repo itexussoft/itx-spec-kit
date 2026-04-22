@@ -32,6 +32,13 @@ generated_at: "YYYY-MM-DDTHH:MM:SS+00:00"
 ## Selected Patterns To Load
 - <pattern-file.md | none>
 
+## Targeted Micro-Overlays
+- <ACL / security / TDD overlays only when relevant to this plan>
+
+## Active Context
+- This execution brief is the active context snapshot for the current workstream.
+- <working assumptions and open questions, when present>
+
 ## Constraints and Invariants
 - <max 8 bullets>
 
@@ -46,4 +53,3 @@ generated_at: "YYYY-MM-DDTHH:MM:SS+00:00"
 
 ## Human Approval Required
 - <only when active human hold exists>
-

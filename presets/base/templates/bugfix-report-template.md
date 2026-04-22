@@ -44,6 +44,14 @@ _Summarize the technical root cause and affected code path._
 
 _Describe the minimal correction approach and why it is safe._
 
+## 6b. Overlay Triggers (Optional)
+
+_Use only when relevant to this bugfix._
+
+- ACL trigger: if defect is at a third-party/legacy boundary, keep vendor models/errors isolated behind adapters.
+- Security micro-overlays: include auth/secrets, OWASP, or rate-limiting checks when the defect touches trust boundaries.
+- TDD rule: start with a failing regression/unit test for the reproduced defect before implementing the fix.
+
 ---
 
 _Template source: `presets/base/templates/bugfix-report-template.md`_

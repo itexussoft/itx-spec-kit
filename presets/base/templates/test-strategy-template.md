@@ -33,6 +33,12 @@
 |----------|------------------|----------------------|
 | | | |
 
+## 4b. TDD and Regression Loop
+
+- For `bugfix` and `refactor` work classes, define the initial failing unit/regression test slice before production edits.
+- For modify-style patch changes, prefer the same red-green-refactor loop when business behavior changes.
+- Keep this additive to existing E2E/integration requirements; do not replace them.
+
 ## 5. Test Environment
 
 - Runtime/services required:

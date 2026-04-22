@@ -191,6 +191,8 @@ def _format_execution_brief(
     out_scope: List[str],
     file_refs: List[str],
     selected_patterns: List[str],
+    targeted_overlays: List[str],
+    active_context: List[str],
     constraints: List[str],
     risks: List[str],
     verification: List[str],
@@ -234,6 +236,14 @@ def _format_execution_brief(
     if selected_patterns:
         lines.extend(["", "## Selected Patterns To Load"])
         lines.extend([f"- {item}" for item in selected_patterns[:8]])
+    if targeted_overlays:
+        lines.extend(["", "## Targeted Micro-Overlays"])
+        lines.extend([f"- {item}" for item in targeted_overlays[:8]])
+    lines.extend(["", "## Active Context"])
+    lines.extend(
+        [f"- {item}" for item in active_context[:4]]
+        or ["- Use this execution brief as the active context snapshot for the current workstream."]
+    )
     if constraints:
         lines.extend(["", "## Constraints and Invariants"])
         lines.extend([f"- {item}" for item in constraints[:8]])
@@ -288,6 +298,102 @@ def _execution_brief_triggers(
     return list(dict.fromkeys(triggers))
 
 
+def _derive_targeted_overlays(
+    *,
+    work_class: str,
+    plan_text: str,
+    selected_patterns: Sequence[str],
+    file_refs: Sequence[str],
+) -> List[str]:
+    overlays: List[str] = []
+    lowered = plan_text.lower()
+    selected_set = {item.lower() for item in selected_patterns}
+    ref_text = "\n".join(file_refs).lower()
+
+    acl_keywords = (
+        "third-party",
+        "third party",
+        "vendor",
+        "legacy",
+        "external api",
+        "external service",
+    )
+    if "adapter-anti-corruption.md" in selected_set or any(keyword in lowered for keyword in acl_keywords):
+        overlays.append(
+            "ACL boundary: keep vendor DTOs/errors inside adapters and map to internal contracts before domain use."
+        )
+
+    auth_keywords = (
+        "oauth",
+        "oidc",
+        "jwt",
+        "token",
+        "secret",
+        "credential",
+        "password",
+        "api key",
+        "authentication",
+        "authorization",
+        "authz",
+    )
+    if any(keyword in lowered for keyword in auth_keywords):
+        overlays.append(
+            "Security/auth-secrets: validate auth claims and avoid hardcoded or logged secrets."
+        )
+
+    owasp_keywords = (
+        "public api",
+        "untrusted input",
+        "sql",
+        "nosql",
+        "xss",
+        "ssrf",
+        "injection",
+        "idor",
+        "broken access control",
+        "access control",
+    )
+    if any(keyword in lowered for keyword in owasp_keywords):
+        overlays.append(
+            "Security/OWASP: enforce input validation, least-privilege access control, and injection-safe data access."
+        )
+
+    rate_limit_keywords = ("rate limit", "throttle", "ddos", "gateway", "burst", "abuse")
+    if any(keyword in lowered for keyword in rate_limit_keywords) or (
+        "public api" in lowered and ("login" in lowered or "auth" in lowered)
+    ):
+        overlays.append(
+            "Security/rate-limiting: define bounded request policies for sensitive or public endpoints."
+        )
+
+    modify_like_patch = work_class in {"patch", "tooling"} and any(
+        marker in lowered for marker in ("modify", "behavior change", "change existing")
+    )
+    behavior_change_markers = (
+        "modify existing behavior",
+        "functional change",
+        "user-visible change",
+    )
+    behavior_adjacent_refactor = work_class == "refactor" and any(marker in lowered for marker in behavior_change_markers)
+    if work_class == "bugfix" or behavior_adjacent_refactor or modify_like_patch:
+        overlays.append(
+            "TDD loop: prefer red-green-refactor for changed business behavior before broad implementation edits."
+        )
+
+    if any(marker in lowered for marker in ("/review", "review.run", "review phase")):
+        overlays.append("Review overlay: produce severity-ordered findings and avoid feature implementation in review.")
+    if any(marker in lowered for marker in ("/cleanup", "cleanup.run", "cleanup phase")):
+        overlays.append("Janitor overlay: keep cleanup evidence-driven and request approval before destructive removal.")
+
+    if any(token in ref_text for token in ("vendor", "third_party", "legacy")):
+        if not any(item.startswith("ACL boundary:") for item in overlays):
+            overlays.append(
+                "ACL boundary: keep vendor DTOs/errors inside adapters and map to internal contracts before domain use."
+            )
+
+    return list(dict.fromkeys(overlays))
+
+
 def _append_pre_action_audit_log(
     *,
     workspace: Path,
@@ -295,6 +401,7 @@ def _append_pre_action_audit_log(
     plan_path: Path,
     triggers: Sequence[str],
     file_refs: Sequence[str],
+    objective: Sequence[str],
     verification_targets: Sequence[str],
 ) -> None:
     if not triggers:
@@ -313,6 +420,8 @@ def _append_pre_action_audit_log(
                 f"## Pre-Action Audit ({_now_iso_utc()})",
                 f"- Signature: `{signature}`",
                 f"- Action: `{trigger}`",
+                f"- Why: `{objective[0] if objective else 'Planned high-risk change requires explicit pre-action record.'}`",
+                f"- Expected Outcome: `{'; '.join(verification_targets[:2]) or 'Preserve expected behavior with gate and regression evidence.'}`",
                 f"- Trigger Reason: high-risk action detected from planning artifacts",
                 f"- Intended Scope: `{', '.join(file_refs[:8]) or plan_path.name}`",
                 "- Rollback Note: revert scoped edits and rerun gate checks before retry",
@@ -557,6 +666,31 @@ def _generate_execution_brief(workspace: Path, config: Dict[str, Any], policy: D
     if has_tier2:
         approval_holds.append("Outstanding Tier 2 gate findings require explicit human decision.")
 
+    assumptions: List[str] = []
+    for heading, body in sections.items():
+        heading_lower = heading.lower()
+        if "assumption" in heading_lower:
+            assumptions.extend(_parse_compact_lines(body, limit=3))
+
+    open_questions: List[str] = []
+    for heading, body in sections.items():
+        heading_lower = heading.lower()
+        if "open question" in heading_lower:
+            open_questions.extend(_parse_compact_lines(body, limit=3))
+
+    active_context: List[str] = [
+        "This execution brief is the active context snapshot for this workstream (no separate memory-bank context file)."
+    ]
+    active_context.extend([f"Working assumption: {item}" for item in assumptions[:2]])
+    active_context.extend([f"Open question: {item}" for item in open_questions[:2]])
+
+    targeted_overlays = _derive_targeted_overlays(
+        work_class=work_class,
+        plan_text=plan_text,
+        selected_patterns=selected_patterns,
+        file_refs=file_refs,
+    )
+
     generated_from = ["plan"]
     if task_files:
         generated_from.append("tasks")
@@ -579,6 +713,8 @@ def _generate_execution_brief(workspace: Path, config: Dict[str, Any], policy: D
         out_scope=out_scope,
         file_refs=dedup_files,
         selected_patterns=selected_patterns,
+        targeted_overlays=targeted_overlays,
+        active_context=active_context,
         constraints=dedup_constraints,
         risks=dedup_risks,
         verification=dedup_verification,
@@ -601,5 +737,6 @@ def _generate_execution_brief(workspace: Path, config: Dict[str, Any], policy: D
         plan_path=plan_path,
         triggers=triggers,
         file_refs=dedup_files,
+        objective=objective,
         verification_targets=dedup_verification,
     )

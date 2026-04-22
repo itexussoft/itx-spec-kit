@@ -45,6 +45,8 @@ the command's markdown prompt, and prints it to stdout wrapped in markers.
 2. **Never improvise replacement checks.** If the runner adapter fails (exit code ≠ 0), report the error verbatim. Do not substitute your own lint/type/test commands as a "review" replacement.
 3. **Execute locally-resolved prompts.** When the adapter returns a prompt envelope, you MUST follow the instructions inside it — they are the extension's canonical agent prompt.
 4. The runner adapter resolves CLIs in priority order: `spec-kit` → `specify` → `uvx`. If none can dispatch the command, it resolves the extension prompt from the local workspace.
+5. **Review overlay:** keep `/speckit.review.run` risk-focused and severity-ordered; do not implement new feature work while handling review findings.
+6. **Janitor overlay:** keep `/speckit.cleanup.run` evidence-driven; request explicit approval before destructive cleanup actions.
 
 ### Other `/speckit.*` commands
 
