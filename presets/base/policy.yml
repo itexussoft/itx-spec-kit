@@ -27,24 +27,32 @@ work_classes:
     gate_profile: patch-safe
   refactor:
     allowed_templates:
-      - "patch-plan-template.md"
+      - "refactor-plan-template.md"
     mandatory_sections:
-      - "## 1. Problem Statement"
-      - "## 2. Files / Modules Affected"
+      - "## 1. Goal"
+      - "## 2. Scope / Non-Scope"
+      - "## 3. Invariants to Preserve"
+      - "## 4. Public Contract Impact"
+      - "## 5. Behavioral Equivalence Strategy"
+      - "## 6. Regression Strategy"
     pattern_selection: optional
-    task_policy: required
+    task_policy: optional
     testing_expectation: regression-required
-    gate_profile: patch-safe
+    gate_profile: refactor-safe
   bugfix:
     allowed_templates:
-      - "patch-plan-template.md"
+      - "bugfix-report-template.md"
     mandatory_sections:
-      - "## 1. Problem Statement"
-      - "## 2. Files / Modules Affected"
+      - "## 1. Symptom"
+      - "## 2. Reproduction"
+      - "## 3. Expected Behavior"
+      - "## 4. Regression Test Target"
+      - "## 5. Root Cause"
+      - "## 6. Fix Strategy"
     pattern_selection: optional
-    task_policy: required
+    task_policy: optional
     testing_expectation: regression-required
-    gate_profile: patch-safe
+    gate_profile: bugfix-fast
   migration:
     allowed_templates:
       - "system-design-plan-template.md"

@@ -31,29 +31,29 @@ phases:
       - clarification_log
       - risk_history
     validation:
-      - "selected_plan_template in [full-plan-template.md, patch-plan-template.md]"
+      - "selected_plan_template in [system-design-plan-template.md, patch-plan-template.md, refactor-plan-template.md, bugfix-report-template.md]"
       - "plan includes required sections for chosen tier"
 
   tasks:
     required_inputs:
       - approved_plan
-      - task_template
     optional_inputs:
+      - task_template
       - implementation_constraints
     validation:
-      - "tasks.md exists"
-      - "each task references plan section and requirement id"
+      - "tasks.md required only for work classes with task_policy: required (feature and legacy patch path)"
+      - "if tasks.md exists, each task references plan section and requirement id"
 
   implement:
     required_inputs:
-      - tasks_document
       - plan_document
       - repository_state
     optional_inputs:
+      - tasks_document
       - test_fixtures
       - mocks
     validation:
-      - "at least one unchecked task exists before implementation start"
+      - "at least one unchecked task exists before implementation start only when task_policy: required or tasks.md is present"
       - "working tree clean or changes attributable to current feature branch"
 
   review:
@@ -88,3 +88,33 @@ cross_phase_rules:
   - id: decision-log-required
     description: "Authority-based decisions must be appended to decision log"
     applies_to: [plan, implement, review, deliver]
+
+work_class_artifact_contracts:
+  feature:
+    required_artifacts:
+      - "spec.md"
+      - "system-design-plan.md"
+      - "tasks.md"
+    validation:
+      - "work_class maps to feature policy"
+  refactor:
+    required_artifacts:
+      - "refactor-plan.md"
+    optional_artifacts:
+      - "tasks.md"
+    validation:
+      - "work_class maps to refactor policy"
+      - "tasks.md may be omitted for scoped refactor changes"
+  bugfix:
+    required_artifacts:
+      - "bugfix-report.md"
+    optional_artifacts:
+      - "tasks.md"
+    validation:
+      - "work_class maps to bugfix policy"
+      - "tasks.md may be omitted for single-path bugfixes"
+
+legacy_compatibility:
+  plan_filename_work_class:
+    system-design-plan.md: feature
+    patch-plan.md: patch

@@ -63,6 +63,24 @@ def write_policy(workspace: Path) -> None:
         dest.write_text(policy_src.read_text(encoding="utf-8"), encoding="utf-8")
 
 
+def write_workflow_state_feature(workspace: Path, feature: str) -> None:
+    state_path = workspace / ".specify" / "context" / "workflow-state.yml"
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    state_path.write_text(
+        "\n".join(
+            [
+                f'feature: "{feature}"',
+                'current_phase: "tasks"',
+                "phases:",
+                "  tasks:",
+                "    status: in_progress",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
 def write_e2e_test(workspace: Path, name: str = "e2e_test_orders.py", with_assertion: bool = True) -> Path:
     content = "def test_order_flow():\n    assert True\n" if with_assertion else "def test_order_flow():\n    pass\n"
     target = workspace / name
@@ -87,6 +105,227 @@ class OrchestratorTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0)
             feedback = ws / ".specify" / "context" / "gate_feedback.md"
             self.assertTrue(feedback.exists())
+
+    def test_after_tasks_refactor_plan_without_tasks_is_allowed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-r").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-r" / "refactor-plan.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: refactor",
+                        "---",
+                        "# Refactor plan",
+                        "## 1. Goal",
+                        "Improve internal module boundaries without changing behavior.",
+                        "## 2. Scope / Non-Scope",
+                        "- In scope: service-layer extraction",
+                        "- Out of scope: API contract changes",
+                        "## 3. Invariants to Preserve",
+                        "- Public API response shape remains unchanged",
+                        "## 4. Public Contract Impact",
+                        "None",
+                        "## 5. Behavioral Equivalence Strategy",
+                        "- Compare baseline integration outputs before/after",
+                        "## 6. Regression Strategy",
+                        "- Add integration regression for order orchestration path",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_tasks")
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Gates passed", result.stdout)
+            feedback = ws / ".specify" / "context" / "gate_feedback.md"
+            if feedback.exists():
+                self.assertNotIn("tasks-presence", feedback.read_text(encoding="utf-8"))
+
+    def test_after_tasks_bugfix_report_without_tasks_is_allowed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-b").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-b" / "bugfix-report.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: bugfix",
+                        "---",
+                        "# Bugfix report",
+                        "## 1. Symptom",
+                        "- Checkout endpoint intermittently returns 500.",
+                        "## 2. Reproduction",
+                        "1. Create cart with expired promo token",
+                        "2. Submit checkout request",
+                        "3. Observe 500 response",
+                        "## 3. Expected Behavior",
+                        "- Endpoint returns 400 with structured validation error.",
+                        "## 4. Regression Test Target",
+                        "- Add integration test for expired promo checkout path",
+                        "## 5. Root Cause",
+                        "- Null handling gap in promo validator",
+                        "## 6. Fix Strategy",
+                        "- Guard null token state and return domain validation error",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_tasks")
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Gates passed", result.stdout)
+            feedback = ws / ".specify" / "context" / "gate_feedback.md"
+            if feedback.exists():
+                self.assertNotIn("tasks-presence", feedback.read_text(encoding="utf-8"))
+
+    def test_after_tasks_patch_plan_without_tasks_still_requires_tasks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-p").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-p" / "patch-plan.md").write_text(
+                "\n".join(
+                    [
+                        "# Patch plan",
+                        "## 1. Problem Statement",
+                        "Fix a scoped issue in existing module",
+                        "## 2. Files / Modules Affected",
+                        "- src/service.py",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_tasks")
+            self.assertEqual(result.returncode, 0)
+            feedback = ws / ".specify" / "context" / "gate_feedback.md"
+            self.assertTrue(feedback.exists())
+            self.assertIn("tasks-presence", feedback.read_text(encoding="utf-8"))
+
+    def test_after_tasks_active_bugfix_scope_ignores_other_feature_plans(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+
+            (ws / "specs" / "feature-required").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-required" / "system-design-plan.md").write_text(
+                "\n".join(
+                    [
+                        "# Plan",
+                        "## 4. Architectural Patterns Applied",
+                        "- DDD",
+                        "## 4b. Code-Level Design Patterns Applied",
+                        "- Command + Handler",
+                        "## 5. DDD Aggregates",
+                        "- Account",
+                        "## 13. Test Strategy",
+                        "- E2E journey",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (ws / "specs" / "feature-bugfix").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-bugfix" / "bugfix-report.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: bugfix",
+                        "---",
+                        "# Bugfix report",
+                        "## 1. Symptom",
+                        "- Failure in checkout path",
+                        "## 2. Reproduction",
+                        "1. Submit request",
+                        "2. Observe 500",
+                        "## 3. Expected Behavior",
+                        "- Return 400",
+                        "## 4. Regression Test Target",
+                        "- Add integration regression",
+                        "## 5. Root Cause",
+                        "- Missing guard",
+                        "## 6. Fix Strategy",
+                        "- Add guard",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            write_workflow_state_feature(ws, "feature-bugfix")
+
+            result = self.run_gate(ws, "after_tasks")
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Gates passed", result.stdout)
+            feedback = ws / ".specify" / "context" / "gate_feedback.md"
+            if feedback.exists():
+                self.assertNotIn("tasks-presence", feedback.read_text(encoding="utf-8"))
+
+    def test_after_review_active_bugfix_scope_ignores_unchecked_tasks_in_other_feature(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            write_e2e_test(ws)
+
+            write_workflow_state_feature(ws, "feature-bugfix")
+            state_path = ws / ".specify" / "context" / "workflow-state.yml"
+            state_path.write_text(
+                "\n".join(
+                    [
+                        'feature: "feature-bugfix"',
+                        'current_phase: "review"',
+                        "phases:",
+                        "  review:",
+                        "    status: in_progress",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            (ws / "specs" / "feature-required").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-required" / "tasks.md").write_text("- [ ] unfinished task\n", encoding="utf-8")
+
+            (ws / "specs" / "feature-bugfix").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-bugfix" / "bugfix-report.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: bugfix",
+                        "---",
+                        "# Bugfix report",
+                        "## 1. Symptom",
+                        "- Failure in checkout path",
+                        "## 2. Reproduction",
+                        "1. Submit request",
+                        "2. Observe 500",
+                        "## 3. Expected Behavior",
+                        "- Return 400",
+                        "## 4. Regression Test Target",
+                        "- Add integration regression",
+                        "## 5. Root Cause",
+                        "- Missing guard",
+                        "## 6. Fix Strategy",
+                        "- Add guard",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_gate(ws, "after_review")
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Gates passed", result.stdout)
+            feedback = ws / ".specify" / "context" / "gate_feedback.md"
+            if feedback.exists():
+                self.assertNotIn("completion-tasks-unchecked", feedback.read_text(encoding="utf-8"))
 
     def test_after_tasks_feature_local_tasks_file_passes(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -644,13 +883,22 @@ class OrchestratorTests(unittest.TestCase):
                 "\n".join(
                     [
                         "---",
-                        "work_class: patch",
+                        "work_class: refactor",
                         "---",
                         "# Refactor plan",
-                        "## 1. Problem Statement",
-                        "Refactor internals without changing behavior",
-                        "## 2. Files / Modules Affected",
-                        "- src/refactor_target.py",
+                        "## 1. Goal",
+                        "Refactor internals without changing behavior.",
+                        "## 2. Scope / Non-Scope",
+                        "- In scope: extract service internals",
+                        "- Out of scope: endpoint contract changes",
+                        "## 3. Invariants to Preserve",
+                        "- Existing API payloads and status codes",
+                        "## 4. Public Contract Impact",
+                        "None",
+                        "## 5. Behavioral Equivalence Strategy",
+                        "- Compare integration snapshots before and after",
+                        "## 6. Regression Strategy",
+                        "- Add regression test for refactored orchestration path",
                         "",
                     ]
                 ),
@@ -670,13 +918,22 @@ class OrchestratorTests(unittest.TestCase):
                 "\n".join(
                     [
                         "---",
-                        "work_class: patch",
+                        "work_class: bugfix",
                         "---",
                         "# Bugfix report",
-                        "## 1. Problem Statement",
-                        "Fix a regression introduced in the last release",
-                        "## 2. Files / Modules Affected",
-                        "- src/service.py",
+                        "## 1. Symptom",
+                        "- Checkout flow returns 500 for expired promo token.",
+                        "## 2. Reproduction",
+                        "1. Submit checkout with expired promo token",
+                        "2. Observe HTTP 500",
+                        "## 3. Expected Behavior",
+                        "- Return HTTP 400 with validation error payload.",
+                        "## 4. Regression Test Target",
+                        "- Add integration test for expired promo checkout flow",
+                        "## 5. Root Cause",
+                        "- Missing null guard in promo validation branch",
+                        "## 6. Fix Strategy",
+                        "- Add guard and map to validation error response",
                         "",
                     ]
                 ),
@@ -741,6 +998,75 @@ class OrchestratorTests(unittest.TestCase):
             text = feedback.read_text(encoding="utf-8")
             self.assertIn("plan-section-missing", text)
             self.assertNotIn("plan-work-class-unresolved", text)
+
+    def test_after_plan_refactor_plan_missing_required_section_returns_tier1(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-r").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-r" / "refactor-plan.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: refactor",
+                        "---",
+                        "# Refactor plan",
+                        "## 1. Goal",
+                        "Improve internal structure while preserving behavior.",
+                        "## 2. Scope / Non-Scope",
+                        "- In scope: repository abstraction cleanup",
+                        "## 3. Invariants to Preserve",
+                        "- API contract and persistence format",
+                        "## 4. Public Contract Impact",
+                        "None",
+                        "## 5. Behavioral Equivalence Strategy",
+                        "- Compare baseline snapshots",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            feedback = ws / ".specify" / "context" / "gate_feedback.md"
+            self.assertTrue(feedback.exists())
+            self.assertIn("plan-section-missing", feedback.read_text(encoding="utf-8"))
+
+    def test_after_plan_bugfix_report_missing_required_section_returns_tier1(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-b").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-b" / "bugfix-report.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: bugfix",
+                        "---",
+                        "# Bugfix report",
+                        "## 1. Symptom",
+                        "- Endpoint returns 500 for malformed payload",
+                        "## 2. Reproduction",
+                        "1. Send malformed payload",
+                        "2. Observe 500 response",
+                        "## 3. Expected Behavior",
+                        "- Endpoint returns 400 validation error",
+                        "## 4. Regression Test Target",
+                        "- Add integration test for malformed payload",
+                        "## 5. Root Cause",
+                        "- Missing validation branch",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            feedback = ws / ".specify" / "context" / "gate_feedback.md"
+            self.assertTrue(feedback.exists())
+            self.assertIn("plan-section-missing", feedback.read_text(encoding="utf-8"))
 
     def test_after_plan_migration_plan_with_work_class_is_discovered(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1352,6 +1678,44 @@ class OrchestratorTests(unittest.TestCase):
             entry = work_classes.get(work_class)
             self.assertIsInstance(entry, dict)
             self.assertTrue(required_fields.issubset(set(entry.keys())))
+
+        self.assertEqual(
+            work_classes["refactor"].get("allowed_templates"),
+            ["refactor-plan-template.md"],
+        )
+        self.assertEqual(work_classes["refactor"].get("task_policy"), "optional")
+        self.assertEqual(work_classes["refactor"].get("gate_profile"), "refactor-safe")
+        self.assertEqual(
+            work_classes["bugfix"].get("allowed_templates"),
+            ["bugfix-report-template.md"],
+        )
+        self.assertEqual(work_classes["bugfix"].get("task_policy"), "optional")
+        self.assertEqual(work_classes["bugfix"].get("gate_profile"), "bugfix-fast")
+
+    def test_wave_b_templates_include_work_class_frontmatter(self):
+        refactor_tpl = ROOT / "presets" / "base" / "templates" / "refactor-plan-template.md"
+        bugfix_tpl = ROOT / "presets" / "base" / "templates" / "bugfix-report-template.md"
+
+        refactor_text = refactor_tpl.read_text(encoding="utf-8")
+        bugfix_text = bugfix_tpl.read_text(encoding="utf-8")
+
+        self.assertIn("---", refactor_text)
+        self.assertIn("work_class: refactor", refactor_text)
+        self.assertIn("---", bugfix_text)
+        self.assertIn("work_class: bugfix", bugfix_text)
+
+    def test_input_contract_plan_templates_reference_system_design_name(self):
+        contracts_path = ROOT / "presets" / "base" / "input-contracts.yml"
+        text = contracts_path.read_text(encoding="utf-8")
+        self.assertIn("system-design-plan-template.md", text)
+        self.assertNotIn("full-plan-template.md", text)
+
+    def test_input_contract_tasks_are_conditional_for_wave_b_work_classes(self):
+        contracts_path = ROOT / "presets" / "base" / "input-contracts.yml"
+        text = contracts_path.read_text(encoding="utf-8")
+        self.assertIn("tasks.md required only for work classes with task_policy: required", text)
+        self.assertIn("tasks_document", text)
+        self.assertIn("optional_inputs:", text)
 
     def test_after_tasks_does_not_run_domain_checks(self):
         with tempfile.TemporaryDirectory() as tmp:

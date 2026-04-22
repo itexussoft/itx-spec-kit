@@ -59,26 +59,34 @@ _DEFAULT_POLICY: Dict[str, Any] = {
             "gate_profile": "patch-safe",
         },
         "refactor": {
-            "allowed_templates": ["patch-plan-template.md"],
+            "allowed_templates": ["refactor-plan-template.md"],
             "mandatory_sections": [
-                "## 1. Problem Statement",
-                "## 2. Files / Modules Affected",
+                "## 1. Goal",
+                "## 2. Scope / Non-Scope",
+                "## 3. Invariants to Preserve",
+                "## 4. Public Contract Impact",
+                "## 5. Behavioral Equivalence Strategy",
+                "## 6. Regression Strategy",
             ],
             "pattern_selection": "optional",
-            "task_policy": "required",
+            "task_policy": "optional",
             "testing_expectation": "regression-required",
-            "gate_profile": "patch-safe",
+            "gate_profile": "refactor-safe",
         },
         "bugfix": {
-            "allowed_templates": ["patch-plan-template.md"],
+            "allowed_templates": ["bugfix-report-template.md"],
             "mandatory_sections": [
-                "## 1. Problem Statement",
-                "## 2. Files / Modules Affected",
+                "## 1. Symptom",
+                "## 2. Reproduction",
+                "## 3. Expected Behavior",
+                "## 4. Regression Test Target",
+                "## 5. Root Cause",
+                "## 6. Fix Strategy",
             ],
             "pattern_selection": "optional",
-            "task_policy": "required",
+            "task_policy": "optional",
             "testing_expectation": "regression-required",
-            "gate_profile": "patch-safe",
+            "gate_profile": "bugfix-fast",
         },
         "migration": {
             "allowed_templates": ["system-design-plan-template.md", "patch-plan-template.md"],
@@ -900,6 +908,101 @@ def _resolve_plan_policy_entry(plan_path: Path, policy: Dict[str, Any]) -> tuple
     return None, None
 
 
+def _entry_requires_tasks(policy_entry: Mapping[str, Any]) -> bool:
+    task_policy = policy_entry.get("task_policy")
+    if isinstance(task_policy, str):
+        return task_policy.strip().lower() == "required"
+    return True
+
+
+def _load_active_feature_from_workflow_state(workspace: Path) -> str | None:
+    state_path = workspace / ".specify" / "context" / "workflow-state.yml"
+    if not state_path.exists():
+        return None
+    try:
+        data = yaml.safe_load(state_path.read_text(encoding="utf-8"))
+    except (yaml.YAMLError, OSError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    feature = data.get("feature")
+    if not isinstance(feature, str):
+        return None
+    normalized = feature.strip()
+    return normalized or None
+
+
+def _plan_files_for_task_policy_resolution(workspace: Path) -> List[Path]:
+    all_plan_files = _find_plan_files(workspace)
+    if not all_plan_files:
+        return []
+
+    active_feature = _load_active_feature_from_workflow_state(workspace)
+    if not active_feature:
+        return all_plan_files
+
+    feature_root = workspace / "specs" / active_feature
+    scoped: List[Path] = []
+    for plan_file in all_plan_files:
+        try:
+            plan_file.relative_to(feature_root)
+        except ValueError:
+            continue
+        scoped.append(plan_file)
+    return scoped or all_plan_files
+
+
+def _task_files_for_review_scope(workspace: Path, task_files: Sequence[Path]) -> List[Path]:
+    active_feature = _load_active_feature_from_workflow_state(workspace)
+    if not active_feature:
+        return list(task_files)
+
+    feature_root = workspace / "specs" / active_feature
+    scoped: List[Path] = []
+    for task_file in task_files:
+        try:
+            rel = task_file.relative_to(workspace)
+        except ValueError:
+            continue
+        if rel.parts and rel.parts[0] == ".specify":
+            scoped.append(task_file)
+            continue
+        if rel == Path("tasks.md"):
+            scoped.append(task_file)
+            continue
+        try:
+            task_file.relative_to(feature_root)
+        except ValueError:
+            continue
+        scoped.append(task_file)
+    return scoped
+
+
+def _tasks_required_for_workspace(workspace: Path, policy: Dict[str, Any]) -> bool:
+    """Determine whether tasks.md is required for the current workspace context.
+
+    Wave B rule:
+    - Preserve strict legacy behavior by default.
+    - Resolve context from active feature workflow state when available.
+    - If resolvable plan artifacts exist and all of them have optional task_policy,
+      tasks.md is not required.
+    """
+    plan_files = _plan_files_for_task_policy_resolution(workspace)
+    if not plan_files:
+        return True
+
+    resolved_entries: List[Mapping[str, Any]] = []
+    for plan_file in plan_files:
+        policy_entry, _ = _resolve_plan_policy_entry(plan_file, policy)
+        if policy_entry is not None:
+            resolved_entries.append(policy_entry)
+
+    if not resolved_entries:
+        return True
+
+    return any(_entry_requires_tasks(entry) for entry in resolved_entries)
+
+
 def _validate_plan_content(plan_path: Path, policy: Dict[str, Any]) -> List[Finding]:
     """Check that mandatory sections exist and are not just template placeholders."""
     findings: List[Finding] = []
@@ -1154,7 +1257,8 @@ def run_generic_checks(
 
     if event == "after_tasks":
         task_files = _find_task_files(workspace)
-        if not task_files:
+        tasks_required = _tasks_required_for_workspace(workspace, policy)
+        if not task_files and tasks_required:
             findings.append(
                 {
                     "severity": TIER_1,
@@ -1162,14 +1266,14 @@ def run_generic_checks(
                     "message": ("No tasks file found after task generation stage. Expected tasks.md under specs/** or legacy fallback locations."),
                 }
             )
-        else:
+        elif task_files:
             findings.extend(_validate_tasks_checkbox_format(task_files))
 
     if event == "after_implement":
         findings.extend(check_e2e_test_presence(workspace))
 
     if event == "after_review":
-        task_files = _find_task_files(workspace)
+        task_files = _task_files_for_review_scope(workspace, _find_task_files(workspace))
         unchecked_count = 0
         for task_file in task_files:
             text = task_file.read_text(encoding="utf-8", errors="ignore")
