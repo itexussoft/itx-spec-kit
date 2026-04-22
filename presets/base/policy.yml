@@ -1,6 +1,90 @@
-# Shared policy manifest — single source of truth for plan tier rules.
+# Shared policy manifest — single source of truth for work-class rules.
 # Consumed by orchestrator.py at runtime. Referenced by templates and constitution.
 
+# Wave A canonical policy model.
+work_classes:
+  feature:
+    allowed_templates:
+      - "system-design-plan-template.md"
+    mandatory_sections:
+      - "## 4. Architectural Patterns Applied"
+      - "## 4b. Code-Level Design Patterns Applied"
+      - "## 5. DDD Aggregates"
+      - "## 13. Test Strategy"
+    pattern_selection: required
+    task_policy: required
+    testing_expectation: e2e-required
+    gate_profile: feature-strict
+  patch:
+    allowed_templates:
+      - "patch-plan-template.md"
+    mandatory_sections:
+      - "## 1. Problem Statement"
+      - "## 2. Files / Modules Affected"
+    pattern_selection: optional
+    task_policy: required
+    testing_expectation: regression-required
+    gate_profile: patch-safe
+  refactor:
+    allowed_templates:
+      - "patch-plan-template.md"
+    mandatory_sections:
+      - "## 1. Problem Statement"
+      - "## 2. Files / Modules Affected"
+    pattern_selection: optional
+    task_policy: required
+    testing_expectation: regression-required
+    gate_profile: patch-safe
+  bugfix:
+    allowed_templates:
+      - "patch-plan-template.md"
+    mandatory_sections:
+      - "## 1. Problem Statement"
+      - "## 2. Files / Modules Affected"
+    pattern_selection: optional
+    task_policy: required
+    testing_expectation: regression-required
+    gate_profile: patch-safe
+  migration:
+    allowed_templates:
+      - "system-design-plan-template.md"
+      - "patch-plan-template.md"
+    mandatory_sections:
+      - "## 4. Architectural Patterns Applied"
+      - "## 4b. Code-Level Design Patterns Applied"
+      - "## 5. DDD Aggregates"
+      - "## 13. Test Strategy"
+    pattern_selection: required
+    task_policy: required
+    testing_expectation: e2e-required
+    gate_profile: feature-strict
+  tooling:
+    allowed_templates:
+      - "patch-plan-template.md"
+    mandatory_sections:
+      - "## 1. Problem Statement"
+      - "## 2. Files / Modules Affected"
+    pattern_selection: optional
+    task_policy: required
+    testing_expectation: regression-required
+    gate_profile: patch-safe
+  spike:
+    allowed_templates:
+      - "patch-plan-template.md"
+    mandatory_sections:
+      - "## 1. Problem Statement"
+      - "## 2. Files / Modules Affected"
+    pattern_selection: optional
+    task_policy: optional
+    testing_expectation: advisory
+    gate_profile: spike-light
+
+# Compatibility map used when frontmatter metadata is absent or invalid.
+legacy_plan_filename_work_class:
+  system-design-plan: feature
+  patch-plan: patch
+
+# Legacy compatibility alias kept for pre-Wave-A consumers.
 plan_tiers:
   system:
     match_filename: "system-design-plan"
