@@ -8,6 +8,7 @@
 3. Prefer deterministic, auditable changes over opaque shortcuts.
 4. Record assumptions and unresolved risks in project docs.
 4b. Reference `docs/knowledge-base/index.md` for the knowledge base index, including workflow documentation and domain-selection guidance.
+4c. Use progressive loading: read `.specify/context/execution-brief.md` first (when present), then load only files explicitly referenced by the brief. Open control-plane artifacts directly only when blocked, investigating gate feedback, or when a human requests it.
 
 ## Architectural Design Requirements
 
@@ -61,6 +62,7 @@ For detailed rationale and examples, see `.specify/patterns/foundational-princip
 - The `after_implement` gate validates E2E test presence and basic assertion quality via naming conventions and file-content checks.
 - In `knowledge.mode: lazy`, `after_plan` also validates that selected pattern filenames are provided (for Full Plans) and resolvable.
 - Patch Plans may declare `<!-- selected_patterns: none -->` to explicitly opt out of pattern selection.
+- Pre-action audit logging is required only for high-risk actions (major refactor, package install/remove, high-risk ops/runtime changes).
 
 ## Delivery Mechanics
 

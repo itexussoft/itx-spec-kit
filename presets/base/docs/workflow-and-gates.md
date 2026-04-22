@@ -7,6 +7,7 @@ Delivery stages:
 3. Clarify (`/speckit.clarify`, optional)
 4. Plan (`/speckit.plan`) — read `.specify/pattern-index.md`, select relevant pattern files, and produce a System Design Plan (`system-design-plan-template.md`) or a patch/tool plan (`patch-plan-template.md`). In lazy knowledge mode, read full candidate pattern content from `.specify/.knowledge-store/` during planning.
 5. **`after_plan` gate** — validates plan presence + mandatory sections; in lazy knowledge mode, materializes only selected pattern files into `.specify/`
+5b. **Execution brief refresh** — after plan/tasks/review checks, the orchestrator updates `.specify/context/execution-brief.md` as a compact agent-facing summary (additive, non-blocking).
 6. Tasks (`/speckit.tasks`) — produces **`tasks.md`** in the active feature directory using `tasks-template.md` as format reference. Every task **must** use `- [ ]` checkbox syntax.
 7. **`after_tasks` gate** — validates tasks file presence and checkbox format
 8. Analyze (`/speckit.analyze`, optional) — **only after** `tasks.md` exists; cross-artifact check needs the task inventory
@@ -17,6 +18,14 @@ Delivery stages:
 13. Deliver — prepare done report and open PR for human merge decision
 
 If **`/speckit.analyze` is blocked** with "tasks.md not found", run **`/speckit.tasks`** again (and ensure spec + plan exist for that feature).
+
+## Progressive loading rule
+
+Use this order during implementation:
+
+1. Read `.specify/context/execution-brief.md` first.
+2. Load only artifacts and pattern files referenced by the brief.
+3. Open raw control-plane files (`policy.yml`, `input-contracts.yml`, `gate_feedback.md`, etc.) only when needed for gate investigation, unblock, or explicit human request.
 
 ## Task format
 
@@ -60,6 +69,8 @@ Gate enforcement rules (mandatory sections, placeholder markers, retry limits) a
 | `after_implement` | `/speckit.implement` | E2E test files exist and include assertions, then domain-specific validators run. Docker preflight connectivity is checked on every gate event when `execution_mode` is `docker-fallback`. |
 | `after_review` | Review completion | All tasks are marked complete, no outstanding Tier 2 findings remain in gate feedback, and E2E assertions are still present. |
 
+Execution-brief generation is intentionally additive and does not change gate pass/fail semantics.
+
 ## Testing validation rules
 
 During `after_implement`, the gate enforces baseline E2E testing hygiene:
@@ -79,6 +90,7 @@ During `after_implement`, the gate enforces baseline E2E testing hygiene:
 - Tier 1 retries are tracked per `event + rule` and escalate to Tier 2 when a specific finding exceeds the retry limit (default: 3, configurable via `gate.max_tier1_retries` in `.itx-config.yml`).
 - Findings can include confidence metadata (`deterministic` or `heuristic`) and remediation ownership for triage.
 - By default, heuristic Tier 1 findings do not auto-escalate on retry unless `gate.heuristic_retry_escalates` is enabled.
+- Pre-action audit log entries are appended only for high-risk planned actions: major refactors, package install/remove activity, and high-risk ops/runtime changes.
 
 ## Passive guidance vs. active validation
 

@@ -112,6 +112,20 @@ During `itx-init`, the `--knowledge-mode` flag controls how pattern files are st
 
 In both modes, `.specify/pattern-index.md` and `docs/knowledge-base/` workflow docs are always copied.
 
+### Execution-brief (agent-light mode)
+
+The orchestrator writes `.specify/context/execution-brief.md` as a compact
+agent-facing summary after `after_plan`, then refreshes it after `after_tasks`
+and `after_review`.
+
+Progressive loading rule:
+
+1. Read `execution-brief.md` first.
+2. Load only files/patterns referenced by the brief.
+3. Open raw control-plane artifacts (`policy.yml`, `input-contracts.yml`,
+   `gate_feedback.md`, etc.) only when needed for investigation or explicit
+   human request.
+
 ## Pattern selection in plans
 
 Plans declare which knowledge files they need using a structured HTML comment:
@@ -298,9 +312,11 @@ python scripts/patch.py --workspace /path/to/project --add-ai kilocode --skip-ad
 - Tier 1 (auto-correction): writes `.specify/context/gate_feedback.md` and exits `0`
 - Tier 2 (hard halt): writes `.specify/context/gate_feedback.md` and exits `1`
 - `after_plan`: validates mandatory plan sections (Full Plan requires sections `4`, `4b`, `5`, and `13`; Patch Plan and Tool Plan use patch-plan requirements `1` and `2`)
+- `after_plan` / `after_tasks` / `after_review`: refresh `.specify/context/execution-brief.md` (additive, non-blocking)
 - `after_tasks`: requires at least one tasks file in supported locations and emits Tier 1 when a tasks file has bare list items (all task items must use checkbox syntax)
 - `after_implement`: validates E2E test presence/assertions before domain validators
 - `after_review`: validates delivery readiness (all tasks completed, no outstanding Tier 2 findings in gate feedback, E2E assertion baseline still met)
+- pre-action audit log: appends `.specify/context/audit-log.md` entries only for high-risk actions (major refactor, package install/remove, high-risk ops/runtime changes)
 
 Gate enforcement rules (mandatory sections, placeholder markers, retry limits) are loaded from `.specify/policy.yml`, which is copied from `presets/base/policy.yml` during bootstrap.
 

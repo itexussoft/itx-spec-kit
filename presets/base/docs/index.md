@@ -2,6 +2,8 @@
 
 Use this index for progressive loading during implementation.
 
+Start from `.specify/context/execution-brief.md` when available. It is the compact agent-facing summary for objective, scope, active risks, verification targets, and next actions.
+
 - `workflow-and-gates.md`: Tiered gate behavior and delivery flow
 - `domain-selection.md`: How domain overlays influence constraints
 - `delivery-mechanics.md`: Branching, commits, PR policy, and review feedback loop
@@ -12,6 +14,9 @@ Use this index for progressive loading during implementation.
 - `input-contracts.yml`: Required/optional inputs and validation rules per workflow phase
 - `notification-events.yml`: Event contract for lifecycle, gate, approval, and error notifications
 - `workflow-state-schema.yml`: Persisted workflow-state structure for resumable execution
+
+Raw gate feedback and pre-action audit log entries remain control-plane artifacts.
+Open them directly only when investigating gate behavior or when a human asks.
 
 ## Foundational Principles
 
@@ -43,6 +48,7 @@ Domain-specific patterns are layered on top during initialization based on the s
 - `architecture-decision-record-template.md`: Standard ADR format
 - `system-design-plan-template.md`: Mandatory template for the `/speckit.plan` phase
 - `patch-plan-template.md`: Lightweight plan template for scoped patch-level changes
+- `execution-brief-template.md`: Compact agent-facing execution summary format
 - `test-strategy-template.md`: Standalone test strategy template for implementation planning
 - `qa-checklist-template.md`: QA checklist for implementation review and handoff
 - `done-report-template.md`: Delivery completion report for traceability and merge handoff
