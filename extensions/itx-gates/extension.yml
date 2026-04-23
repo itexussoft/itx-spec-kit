@@ -3,7 +3,7 @@ schema_version: "1.0"
 extension:
   id: "itx-gates"
   name: "itexus-spec-kit itx-gates"
-  version: 0.2.3
+  version: 0.2.2
   description: "Quality gate orchestrator that runs Itexus tiered validators"
   author: "itexus"
   repository: "https://github.com/sprivalov/itexus-spec-kit"
@@ -30,14 +30,6 @@ provides:
     - name: "speckit.itx-gates.after-review"
       file: "commands/after_review.md"
       description: "Run itx-gates after review"
-
-    - name: "speckit.itx-gates.review-run"
-      file: "commands/review_run.md"
-      description: "Run spec-kit-review via the universal runner adapter"
-
-    - name: "speckit.itx-gates.cleanup-run"
-      file: "commands/cleanup_run.md"
-      description: "Run spec-kit-cleanup via the universal runner adapter"
 
 hooks:
   after_plan:
