@@ -46,6 +46,8 @@ switch ($Task) {
       "extensions/itx-gates/hooks/validators/sast_validator.py",
       "extensions/itx-gates/hooks/validators/health_regex.py",
       "extensions/itx-gates/hooks/validators/saas_platform_heuristic.py",
+      "harnesses/temporal-fakes/example-fake/fake_deployment.py",
+      "harnesses/temporal-fakes/example-fake/contract_test.py",
       "scripts/validate_catalog.py",
       "scripts/build_catalog_artifacts.py",
       "scripts/build_pattern_index.py",
@@ -63,6 +65,7 @@ switch ($Task) {
       "tests/test_architecture_wave_f.py",
       "tests/test_mutation_wave_g.py",
       "tests/test_smell_mapping_h1.py",
+      "tests/test_temporal_fakes_h2.py",
       "tests/test_saas_validator.py",
       "tests/test_sast_and_context_router.py",
       "tests/test_itx_gates_runtime_state.py"

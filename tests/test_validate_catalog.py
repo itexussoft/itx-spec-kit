@@ -30,6 +30,7 @@ class ValidateCatalogTests(unittest.TestCase):
     def make_workspace(self, tmp: Path) -> None:
         (tmp / "catalog").mkdir(parents=True, exist_ok=True)
         (tmp / "presets" / "base").mkdir(parents=True, exist_ok=True)
+        (tmp / "harnesses" / "temporal-fakes").mkdir(parents=True, exist_ok=True)
         (tmp / "presets" / "base" / "templates").mkdir(parents=True, exist_ok=True)
         (tmp / "presets" / "base" / "templates" / "stub.md").write_text("# stub\n", encoding="utf-8")
         (tmp / "extensions" / "itx-gates").mkdir(parents=True, exist_ok=True)
@@ -91,6 +92,36 @@ class ValidateCatalogTests(unittest.TestCase):
                             "detectors": {"sonar": ["java:S138"]},
                             "test_first": {"strategy": "characterization", "hint": "Freeze behavior before extraction."},
                             "advisory": "Prefer Extract Function in small passes.",
+                        }
+                    ],
+                },
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
+        (tmp / "harnesses" / "temporal-fakes" / "scenarios.schema.json").write_text(
+            json.dumps(
+                {
+                    "type": "object",
+                    "required": ["version", "scenarios"],
+                    "properties": {
+                        "version": {"type": "integer"},
+                        "scenarios": {"type": "array"},
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        (tmp / "harnesses" / "temporal-fakes" / "scenarios.yaml").write_text(
+            yaml.safe_dump(
+                {
+                    "version": 1,
+                    "scenarios": [
+                        {
+                            "id": "degrade-error-rate",
+                            "target": {"fake": "deployment", "instance": "default"},
+                            "fault": {"type": "degrade", "params": {"error_rate": 0.3}},
+                            "schedule": {"duration": "60s"},
                         }
                     ],
                 },
@@ -163,6 +194,16 @@ class ValidateCatalogTests(unittest.TestCase):
             self.make_workspace(ws)
             (ws / "presets" / "base" / "smell-catalog.yml").write_text(
                 yaml.safe_dump({"version": 1, "smells": [{"id": "BROKEN"}]}, sort_keys=False),
+                encoding="utf-8",
+            )
+            self.assertEqual(self.run_main_with_workspace(ws), 1)
+
+    def test_validate_catalog_fails_on_invalid_temporal_scenarios(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            self.make_workspace(ws)
+            (ws / "harnesses" / "temporal-fakes" / "scenarios.yaml").write_text(
+                yaml.safe_dump({"version": 1, "scenarios": [{"id": "broken"}]}, sort_keys=False),
                 encoding="utf-8",
             )
             self.assertEqual(self.run_main_with_workspace(ws), 1)

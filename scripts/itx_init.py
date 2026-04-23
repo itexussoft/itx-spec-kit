@@ -204,6 +204,16 @@ def stage_cursor_rules(kit_root: Path, workspace: Path) -> None:
         copy_tree_contents(rules_src, rules_dst)
 
 
+def stage_harnesses(kit_root: Path, workspace: Path, execution_mode: str, container_name: str) -> None:
+    copy_tree_contents(kit_root / "harnesses" / "temporal-fakes", workspace / "harnesses" / "temporal-fakes")
+    if execution_mode == "docker-fallback":
+        copy_tree_contents(kit_root / "harnesses" / "docker-fallbacks", workspace / "harnesses" / "docker-fallbacks")
+        (workspace / "harnesses" / "docker-fallbacks").mkdir(parents=True, exist_ok=True)
+        (workspace / "harnesses" / "docker-fallbacks" / ".env").write_text(
+            f"ITX_CONTAINER_NAME={container_name}\n", encoding="utf-8"
+        )
+
+
 def build_knowledge_manifest_file(kit_root: Path, workspace: Path, domain: str) -> None:
     manifest = build_manifest(kit_root.resolve(), domain)
     output = workspace / ".specify" / "knowledge-manifest.json"
@@ -457,12 +467,7 @@ def main(argv: list[str] | None = None) -> int:
     log("Generating knowledge manifest...")
     build_knowledge_manifest_file(kit_root, workspace, args.domain)
 
-    if args.execution_mode == "docker-fallback":
-        copy_tree_contents(kit_root / "harnesses" / "docker-fallbacks", workspace / "harnesses" / "docker-fallbacks")
-        (workspace / "harnesses" / "docker-fallbacks").mkdir(parents=True, exist_ok=True)
-        (workspace / "harnesses" / "docker-fallbacks" / ".env").write_text(
-            f"ITX_CONTAINER_NAME={container_name}\n", encoding="utf-8"
-        )
+    stage_harnesses(kit_root, workspace, args.execution_mode, container_name)
 
     log("Initialization complete.")
     if args.execution_mode == "docker-fallback":

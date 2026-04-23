@@ -215,6 +215,13 @@ class PatchTests(unittest.TestCase):
             self.assertTrue(migration_doc.exists())
             self.assertIn("Migration Guide", migration_doc.read_text(encoding="utf-8"))
 
+    def test_patch_installs_temporal_fakes_harness(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = self._make_bootstrapped_workspace(tmp)
+            patch_mod.patch_workspace(ROOT, ws)
+            harness_readme = ws / "harnesses" / "temporal-fakes" / "README.md"
+            self.assertTrue(harness_readme.exists())
+
     # ---- fix_tasks_checkboxes ----
 
     def test_fix_tasks_converts_bare_list_items(self):

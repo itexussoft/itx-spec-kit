@@ -147,6 +147,7 @@ class ItxInitTests(unittest.TestCase):
                 mock.patch("itx_init.stage_docs_and_policy"),
                 mock.patch("itx_init.stage_templates"),
                 mock.patch("itx_init.stage_cursor_rules"),
+                mock.patch("itx_init.stage_harnesses"),
                 mock.patch("itx_init.stage_knowledge"),
                 mock.patch("itx_init.merge_pattern_index"),
                 mock.patch("itx_init.build_knowledge_manifest_file"),
@@ -231,6 +232,38 @@ class ItxInitTests(unittest.TestCase):
             self.assertTrue((ws / ".specify" / ".knowledge-store" / "patterns" / "domain-driven-design.md").exists())
             self.assertTrue((ws / ".specify" / "patterns").exists())
             self.assertTrue((ws / ".gitignore").exists())
+
+    def test_stage_harnesses_always_copies_temporal_fakes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            kit = root / "kit"
+            ws = root / "ws"
+            (kit / "harnesses" / "temporal-fakes").mkdir(parents=True)
+            (kit / "harnesses" / "temporal-fakes" / "README.md").write_text("# temporal\n", encoding="utf-8")
+            ws.mkdir()
+
+            itx_init.stage_harnesses(kit, ws, execution_mode="mcp", container_name="unused")
+
+            self.assertTrue((ws / "harnesses" / "temporal-fakes" / "README.md").exists())
+            self.assertFalse((ws / "harnesses" / "docker-fallbacks" / ".env").exists())
+
+    def test_stage_harnesses_writes_docker_env_when_docker_mode(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            kit = root / "kit"
+            ws = root / "ws"
+            (kit / "harnesses" / "temporal-fakes").mkdir(parents=True)
+            (kit / "harnesses" / "docker-fallbacks").mkdir(parents=True)
+            (kit / "harnesses" / "docker-fallbacks" / "docker-compose.yml").write_text("version: '3'\n", encoding="utf-8")
+            ws.mkdir()
+
+            itx_init.stage_harnesses(kit, ws, execution_mode="docker-fallback", container_name="demo")
+
+            self.assertTrue((ws / "harnesses" / "docker-fallbacks" / "docker-compose.yml").exists())
+            self.assertEqual(
+                (ws / "harnesses" / "docker-fallbacks" / ".env").read_text(encoding="utf-8"),
+                "ITX_CONTAINER_NAME=demo\n",
+            )
 
     def test_stage_docs_and_policy_includes_migration_guide(self):
         with tempfile.TemporaryDirectory() as tmp:

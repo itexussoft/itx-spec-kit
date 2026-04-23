@@ -467,6 +467,14 @@ def patch_workspace(kit_root: Path, workspace: Path, force: bool = False) -> Tup
             log(f"Updated Cursor rules ({n} file(s))")
         total += n
 
+    temporal_harness_src = kit_root / "harnesses" / "temporal-fakes"
+    temporal_harness_dst = workspace / "harnesses" / "temporal-fakes"
+    if temporal_harness_src.exists():
+        n = copy_tree(temporal_harness_src, temporal_harness_dst)
+        if n:
+            log(f"Updated temporal-fakes harness ({n} file(s))")
+        total += n
+
     # ---- User-editable files: safe-update with backup / side-file ----
 
     editable_files = [

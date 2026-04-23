@@ -1,0 +1,16 @@
+version: "0.5"
+processes:
+  fake-service:
+    command: python example-fake/fake_deployment.py --port 8080
+    readiness_probe:
+      http_get:
+        host: 127.0.0.1
+        port: 8080
+        path: /healthz
+  scenario-loader:
+    command: python example-fake/fake_deployment.py --print-example-scenarios
+    depends_on:
+      fake-service:
+        condition: process_healthy
+    availability:
+      exit_on_end: true

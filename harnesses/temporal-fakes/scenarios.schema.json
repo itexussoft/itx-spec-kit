@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Temporal Fake Scenario Registry",
+  "type": "object",
+  "required": ["version", "scenarios"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "target", "fault", "schedule"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string"
+          },
+          "target": {
+            "type": "object",
+            "required": ["fake", "instance"],
+            "properties": {
+              "fake": {"type": "string", "minLength": 1},
+              "instance": {"type": "string", "minLength": 1}
+            },
+            "additionalProperties": true
+          },
+          "fault": {
+            "type": "object",
+            "required": ["type", "params"],
+            "properties": {
+              "type": {"type": "string", "minLength": 1},
+              "params": {"type": "object"}
+            },
+            "additionalProperties": true
+          },
+          "schedule": {
+            "type": "object",
+            "required": ["duration"],
+            "properties": {
+              "start_after": {"type": "string", "pattern": "^[0-9]+s$"},
+              "duration": {"type": "string", "pattern": "^[0-9]+s$"},
+              "ramp_up": {"type": "string", "pattern": "^[0-9]+s$"}
+            },
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

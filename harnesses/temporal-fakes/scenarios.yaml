@@ -1,0 +1,24 @@
+version: 1
+scenarios:
+  - id: degrade-error-rate
+    description: Degrade deployment to 30% error rate for 60s
+    target:
+      fake: deployment
+      instance: default
+    fault:
+      type: degrade
+      params:
+        error_rate: 0.3
+    schedule:
+      start_after: 5s
+      duration: 60s
+      ramp_up: 10s
+  - id: deployment-failure
+    target:
+      fake: deployment
+      instance: default
+    fault:
+      type: fail
+      params: {}
+    schedule:
+      duration: 30s
