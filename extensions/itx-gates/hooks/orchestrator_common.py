@@ -44,6 +44,8 @@ _DEFAULT_POLICY: Dict[str, Any] = {
             "task_policy": "required",
             "testing_expectation": "e2e-required",
             "gate_profile": "feature-strict",
+            "traceability_modes": ["requirement", "adr"],
+            "traceability_required": False,
         },
         "patch": {
             "allowed_templates": ["patch-plan-template.md"],
@@ -55,6 +57,8 @@ _DEFAULT_POLICY: Dict[str, Any] = {
             "task_policy": "required",
             "testing_expectation": "regression-required",
             "gate_profile": "patch-safe",
+            "traceability_modes": ["requirement", "invariant", "risk", "incident", "adr"],
+            "traceability_required": False,
         },
         "refactor": {
             "allowed_templates": ["refactor-plan-template.md"],
@@ -70,6 +74,8 @@ _DEFAULT_POLICY: Dict[str, Any] = {
             "task_policy": "optional",
             "testing_expectation": "regression-required",
             "gate_profile": "refactor-safe",
+            "traceability_modes": ["invariant", "risk", "adr"],
+            "traceability_required": False,
         },
         "bugfix": {
             "allowed_templates": ["bugfix-report-template.md"],
@@ -85,19 +91,25 @@ _DEFAULT_POLICY: Dict[str, Any] = {
             "task_policy": "optional",
             "testing_expectation": "regression-required",
             "gate_profile": "bugfix-fast",
+            "traceability_modes": ["incident", "risk", "requirement"],
+            "traceability_required": False,
         },
         "migration": {
-            "allowed_templates": ["system-design-plan-template.md", "patch-plan-template.md"],
+            "allowed_templates": ["migration-plan-template.md"],
             "mandatory_sections": [
-                "## 4. Architectural Patterns Applied",
-                "## 4b. Code-Level Design Patterns Applied",
-                "## 5. DDD Aggregates",
-                "## 13. Test Strategy",
+                "## 1. Migration Goal",
+                "## 2. Current State / Target State",
+                "## 3. Transition Plan",
+                "## 4. Compatibility Window",
+                "## 5. Rollback Strategy",
+                "## 7. Regression and Verification",
             ],
             "pattern_selection": "required",
             "task_policy": "required",
             "testing_expectation": "e2e-required",
-            "gate_profile": "feature-strict",
+            "gate_profile": "migration-safe",
+            "traceability_modes": ["invariant", "risk", "adr"],
+            "traceability_required": True,
         },
         "tooling": {
             "allowed_templates": ["patch-plan-template.md"],
@@ -109,18 +121,81 @@ _DEFAULT_POLICY: Dict[str, Any] = {
             "task_policy": "required",
             "testing_expectation": "regression-required",
             "gate_profile": "patch-safe",
+            "traceability_modes": ["requirement", "risk", "adr"],
+            "traceability_required": False,
         },
         "spike": {
-            "allowed_templates": ["patch-plan-template.md"],
+            "allowed_templates": ["spike-note-template.md"],
             "mandatory_sections": [
-                "## 1. Problem Statement",
-                "## 2. Files / Modules Affected",
+                "## 1. Question",
+                "## 2. Constraints",
+                "## 3. Options Explored",
+                "## 4. Recommendation",
+                "## 5. Next Decision",
             ],
             "pattern_selection": "optional",
             "task_policy": "optional",
             "testing_expectation": "advisory",
             "gate_profile": "spike-light",
+            "traceability_modes": ["risk", "invariant"],
+            "traceability_required": False,
         },
+        "modify": {
+            "allowed_templates": ["modify-plan-template.md"],
+            "mandatory_sections": [
+                "## 1. Problem Statement",
+                "## 2. Files / Modules Affected",
+                "## 5. Regression Testing",
+            ],
+            "pattern_selection": "optional",
+            "task_policy": "optional",
+            "testing_expectation": "regression-required",
+            "gate_profile": "patch-safe",
+            "traceability_modes": ["requirement", "invariant", "risk"],
+            "traceability_required": True,
+        },
+        "hotfix": {
+            "allowed_templates": ["hotfix-report-template.md"],
+            "mandatory_sections": [
+                "## 1. Symptom",
+                "## 2. Reproduction",
+                "## 3. Expected Behavior",
+                "## 4. Regression Test Target",
+                "## 5. Root Cause",
+                "## 6. Fix Strategy",
+            ],
+            "pattern_selection": "optional",
+            "task_policy": "optional",
+            "testing_expectation": "regression-required",
+            "gate_profile": "hotfix-fast",
+            "traceability_modes": ["incident"],
+            "traceability_required": True,
+        },
+        "deprecate": {
+            "allowed_templates": ["deprecate-plan-template.md"],
+            "mandatory_sections": [
+                "## 1. Migration Goal",
+                "## 2. Current State / Target State",
+                "## 3. Transition Plan",
+                "## 4. Compatibility Window",
+                "## 5. Rollback Strategy",
+                "## 6. Dependency Impact and Consumer Rollout",
+                "## 7. Regression and Verification",
+            ],
+            "pattern_selection": "optional",
+            "task_policy": "required",
+            "testing_expectation": "e2e-required",
+            "gate_profile": "migration-safe",
+            "traceability_modes": ["adr", "requirement"],
+            "traceability_required": True,
+        },
+    },
+    "traceability_modes": {
+        "requirement": {"id_field": "requirement_id"},
+        "invariant": {"id_field": "invariant_id"},
+        "risk": {"id_field": "risk_id"},
+        "incident": {"id_field": "incident_id"},
+        "adr": {"id_field": "adr_id"},
     },
     "legacy_plan_filename_work_class": {
         "system-design-plan": "feature",
@@ -518,6 +593,9 @@ def _find_plan_files(workspace: Path) -> List[Path]:
                 or "migration-plan" in lower_name
                 or "tooling-plan" in lower_name
                 or "spike-note" in lower_name
+                or "modify-plan" in lower_name
+                or "hotfix-report" in lower_name
+                or "deprecate-plan" in lower_name
             ):
                 plan_files.append(path)
     deduped: List[Path] = []
@@ -893,6 +971,141 @@ def _entry_requires_tasks(policy_entry: Mapping[str, Any]) -> bool:
     return True
 
 
+def _entry_requires_e2e_checks(policy_entry: Mapping[str, Any]) -> bool:
+    testing_expectation = str(policy_entry.get("testing_expectation", "")).strip().lower()
+    return testing_expectation != "advisory"
+
+
+def _traceability_mode_id_fields(policy: Dict[str, Any]) -> Dict[str, str]:
+    raw_modes = policy.get("traceability_modes")
+    if not isinstance(raw_modes, dict):
+        raw_modes = _DEFAULT_POLICY.get("traceability_modes", {})
+    mapping: Dict[str, str] = {}
+    if not isinstance(raw_modes, dict):
+        return mapping
+    for mode, details in raw_modes.items():
+        if not isinstance(mode, str) or not isinstance(details, dict):
+            continue
+        id_field = details.get("id_field")
+        if isinstance(id_field, str) and id_field.strip():
+            mapping[mode.strip().lower()] = id_field.strip()
+    return mapping
+
+
+def _validate_plan_traceability(
+    *,
+    plan_path: Path,
+    frontmatter: Mapping[str, Any],
+    policy_entry: Mapping[str, Any],
+    policy: Dict[str, Any],
+) -> List[Finding]:
+    findings: List[Finding] = []
+    mode_to_id = _traceability_mode_id_fields(policy)
+    if not mode_to_id:
+        return findings
+
+    required = bool(policy_entry.get("traceability_required", False))
+    allowed_raw = policy_entry.get("traceability_modes")
+    allowed_modes: set[str] = set()
+    if isinstance(allowed_raw, list):
+        for item in allowed_raw:
+            if isinstance(item, str) and item.strip():
+                allowed_modes.add(item.strip().lower())
+    if not allowed_modes:
+        allowed_modes = set(mode_to_id.keys())
+
+    raw_mode = frontmatter.get("traceability_mode")
+    traceability_mode: str | None = None
+    if isinstance(raw_mode, str) and raw_mode.strip():
+        traceability_mode = raw_mode.strip().lower()
+    elif raw_mode is not None:
+        findings.append(
+            {
+                "severity": TIER_1,
+                "rule": "plan-traceability-mode-unresolved",
+                "message": f"Plan '{plan_path.name}' has invalid non-string traceability_mode.",
+            }
+        )
+        return findings
+
+    known_id_fields = set(mode_to_id.values())
+    present_id_fields = []
+    for field in known_id_fields:
+        value = frontmatter.get(field)
+        if isinstance(value, str) and value.strip():
+            present_id_fields.append(field)
+
+    if required and not traceability_mode:
+        findings.append(
+            {
+                "severity": TIER_1,
+                "rule": "plan-traceability-missing",
+                "message": (
+                    f"Plan '{plan_path.name}' is missing required traceability_mode. "
+                    "Declare one mode from policy.traceability_modes with the matching id field."
+                ),
+            }
+        )
+        return findings
+
+    if not traceability_mode:
+        return findings
+
+    if traceability_mode not in mode_to_id:
+        findings.append(
+            {
+                "severity": TIER_1,
+                "rule": "plan-traceability-mode-unresolved",
+                "message": (
+                    f"Plan '{plan_path.name}' has unknown traceability_mode '{traceability_mode}'. "
+                    "Use one of: requirement, invariant, risk, incident, adr."
+                ),
+            }
+        )
+        return findings
+
+    if traceability_mode not in allowed_modes:
+        findings.append(
+            {
+                "severity": TIER_1,
+                "rule": "plan-traceability-mode-disallowed",
+                "message": (
+                    f"Plan '{plan_path.name}' uses traceability_mode '{traceability_mode}' "
+                    "which is not allowed for this work_class."
+                ),
+            }
+        )
+        return findings
+
+    expected_id_field = mode_to_id[traceability_mode]
+    expected_id = frontmatter.get(expected_id_field)
+    if not (isinstance(expected_id, str) and expected_id.strip()):
+        findings.append(
+            {
+                "severity": TIER_1,
+                "rule": "plan-traceability-id-missing",
+                "message": (
+                    f"Plan '{plan_path.name}' declares traceability_mode '{traceability_mode}' "
+                    f"but is missing '{expected_id_field}'."
+                ),
+            }
+        )
+        return findings
+
+    if len(present_id_fields) > 1:
+        findings.append(
+            {
+                "severity": TIER_1,
+                "rule": "plan-traceability-id-ambiguous",
+                "message": (
+                    f"Plan '{plan_path.name}' declares multiple traceability id fields ({', '.join(sorted(present_id_fields))}). "
+                    "Keep only one primary id field matching traceability_mode."
+                ),
+            }
+        )
+    return findings
+
+
 def _load_active_feature_from_workflow_state(workspace: Path) -> str | None:
     state_path = workspace / ".specify" / "context" / "workflow-state.yml"
     if not state_path.exists():
@@ -996,6 +1209,23 @@ def _tasks_required_for_workspace(workspace: Path, policy: Dict[str, Any]) -> bo
     return any(_entry_requires_tasks(entry) for entry in resolved_entries)
 
 
+def _e2e_required_for_workspace(workspace: Path, policy: Dict[str, Any]) -> bool:
+    plan_files = _plan_files_for_task_policy_resolution(workspace)
+    if not plan_files:
+        return True
+
+    resolved_entries: List[Mapping[str, Any]] = []
+    for plan_file in plan_files:
+        policy_entry, _ = _resolve_plan_policy_entry(plan_file, policy)
+        if policy_entry is not None:
+            resolved_entries.append(policy_entry)
+
+    if not resolved_entries:
+        return True
+
+    return any(_entry_requires_e2e_checks(entry) for entry in resolved_entries)
+
+
 def _validate_plan_content(plan_path: Path, policy: Dict[str, Any]) -> List[Finding]:
     findings: List[Finding] = []
     content = plan_path.read_text(encoding="utf-8")
@@ -1029,9 +1259,96 @@ def _validate_plan_content(plan_path: Path, policy: Dict[str, Any]) -> List[Find
                 )
         return findings
 
+    findings.extend(
+        _validate_plan_traceability(
+            plan_path=plan_path,
+            frontmatter=frontmatter,
+            policy_entry=policy_entry,
+            policy=policy,
+        )
+    )
+
     mandatory_headings: List[str] = policy_entry.get("mandatory_sections") or []
     placeholder_markers: List[str] = policy.get("placeholder_markers") or []
     sections = _extract_markdown_h2_sections(content)
+
+    generic_table_headers = {
+        "option",
+        "pros",
+        "cons",
+        "risk",
+        "mitigation",
+        "behavior path",
+        "changed behavior",
+        "changed area",
+        "test type",
+        "file",
+        "dependent consumer",
+        "owner",
+        "rollout action",
+        "target date",
+        "pattern",
+        "file reference",
+        "why it applies",
+    }
+    template_instruction_italics = {
+        "state the target state and why this migration is needed now.",
+        "describe the before and after states at a system level.",
+        "list phased steps for safe rollout, including sequencing and checkpoints.",
+        "list only the patterns needed for this migration design.",
+        "in lazy knowledge mode, use a structured selection block to materialize",
+        "needed files. use `none` if no patterns are required:",
+        "define temporary compatibility behavior and exit criteria.",
+        "define rollback triggers, mechanics, and recovery path.",
+        "describe data integrity checks, backup safeguards, and migration safety controls.",
+        "list regression and verification checks required before and after cutover.",
+        "state the decision question the spike is intended to answer.",
+        "list hard constraints (time, architecture, compliance, interfaces, performance).",
+        "summarize options explored and key findings.",
+        "state the preferred option and rationale.",
+        "state the immediate follow-up decision or implementation step.",
+        "one short paragraph describing the behavior change request.",
+        "list impacted files, modules, or services and the expected scope of edits.",
+        "if any existing patterns from `.specify/patterns/` or `.specify/design-patterns/`",
+        "are relevant, list them. if not, write \"n/a\".",
+        "capture only concrete risks introduced by this behavior change.",
+        "at minimum, declare one regression test that covers the changed behavior path.",
+        "describe the observed failure, including user/system impact.",
+        "provide deterministic reproduction steps and environment context.",
+        "step one",
+        "step two",
+        "observed result",
+        "state the expected correct behavior for the same flow.",
+        "name the concrete regression test(s) that will prevent recurrence.",
+        "summarize the technical root cause and affected code path.",
+        "describe the minimal correction approach and why it is safe.",
+        "state what is being deprecated and the target replacement state.",
+        "list phased steps for warn -> disable -> remove rollout.",
+        "define compatibility duration and explicit exit criteria.",
+        "list dependent services, clients, and owners, plus their migration order and communication plan.",
+    }
+
+    def _is_placeholder_line(raw_line: str) -> bool:
+        stripped = raw_line.strip()
+        if any(marker in raw_line for marker in placeholder_markers):
+            return True
+
+        # Treat known template instruction text as placeholders.
+        if stripped.startswith("_") and stripped.endswith("_"):
+            inner = stripped.strip("_").strip().lower()
+            if inner in template_instruction_italics:
+                return True
+
+        # Ignore template table headers and empty scaffold rows.
+        if stripped.startswith("|"):
+            cells = [cell.strip().lower() for cell in stripped.strip("|").split("|")]
+            if cells and all(not cell for cell in cells):
+                return True
+            non_empty = [cell for cell in cells if cell]
+            if non_empty and all(cell in generic_table_headers for cell in non_empty):
+                return True
+
+        return False
 
     for heading in mandatory_headings:
         section_body = sections.get(heading)
@@ -1048,7 +1365,7 @@ def _validate_plan_content(plan_path: Path, policy: Dict[str, Any]) -> List[Find
         content_lines = [
             line for line in section_body.splitlines() if line.strip() and not line.strip().startswith("|--") and not line.strip().startswith("> ")
         ]
-        real_content = [line for line in content_lines if not any(marker in line for marker in placeholder_markers)]
+        real_content = [line for line in content_lines if not _is_placeholder_line(line)]
 
         if not real_content:
             findings.append(

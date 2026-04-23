@@ -15,10 +15,16 @@
 ## Architectural Design Requirements
 
 5. During `/speckit.plan`, read `.specify/pattern-index.md` for the catalog of available patterns, design-patterns, and anti-patterns. Explicitly reference selected pattern filenames in the plan before implementation. In lazy knowledge mode, use a structured selection block (`<!-- selected_patterns: file.md, ... -->`) so the gate can materialize them, and read candidate pattern content from `.specify/.knowledge-store/` to inform selections.
-6. During `/speckit.plan`, choose one of three plan tiers:
-   - **Full Plan**: required when a feature introduces new Bounded Contexts, new Aggregates, or cross-service/context integrations. Use `system-design-plan-template.md`; Sections 4, 4b, and 5 are mandatory.
-   - **Patch Plan**: allowed when a change is scoped to existing modules and introduces no new Bounded Contexts/Aggregates. Use `patch-plan-template.md`; pattern selection is optional.
-   - **Tool Plan**: uses `patch-plan-template.md` for CLI tools, automation scripts, workflow engines, and infrastructure projects where DDD tactical patterns (Bounded Contexts, Aggregates, Repositories) do not apply. Prefer `cli-orchestrator-architecture.md` and related patterns; use `asynchronous-event-loop-architecture.md` for long-running integration daemons that need overlapping async I/O (for example log watch plus chat plus HTTP sidecars). Rules 7, 9, 10, 11, and 12 do not apply to Tool Plan projects.
+6. During `/speckit.plan`, choose the policy-mapped artifact for the active work class:
+   - `feature` -> `system-design-plan-template.md`
+   - `patch` and `tooling` -> `patch-plan-template.md`
+   - `refactor` -> `refactor-plan-template.md`
+   - `bugfix` -> `bugfix-report-template.md`
+   - `migration` -> `migration-plan-template.md`
+   - `spike` -> `spike-note-template.md`
+   - `modify` -> `modify-plan-template.md`
+   - `hotfix` -> `hotfix-report-template.md`
+   - `deprecate` -> `deprecate-plan-template.md`
 7. Every **Full Plan** must explicitly name which DDD Bounded Contexts, Aggregates, and pattern files from `.specify/patterns/` the design relies on. If the design does not use a pattern, state why.
 8. Record significant architectural decisions using the `architecture-decision-record-template.md` template and store them in `docs/adr/`.
 

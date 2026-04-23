@@ -31,8 +31,9 @@ phases:
       - clarification_log
       - risk_history
     validation:
-      - "selected_plan_template in [system-design-plan-template.md, patch-plan-template.md, refactor-plan-template.md, bugfix-report-template.md]"
+      - "selected_plan_template in [system-design-plan-template.md, patch-plan-template.md, refactor-plan-template.md, bugfix-report-template.md, migration-plan-template.md, spike-note-template.md, modify-plan-template.md, hotfix-report-template.md, deprecate-plan-template.md]"
       - "plan includes required sections for chosen tier"
+      - "when work class requires traceability, plan frontmatter includes traceability_mode plus matching id"
 
   tasks:
     required_inputs:
@@ -41,8 +42,8 @@ phases:
       - task_template
       - implementation_constraints
     validation:
-      - "tasks.md required only for work classes with task_policy: required (feature and legacy patch path)"
-      - "if tasks.md exists, each task references plan section and requirement id"
+      - "tasks.md required only for work classes with task_policy: required (feature, migration, deprecate, and legacy patch path)"
+      - "if tasks.md exists, each task references plan section and the active traceability reference id (as applicable)"
 
   implement:
     required_inputs:
@@ -113,6 +114,43 @@ work_class_artifact_contracts:
     validation:
       - "work_class maps to bugfix policy"
       - "tasks.md may be omitted for single-path bugfixes"
+  migration:
+    required_artifacts:
+      - "migration-plan.md"
+      - "tasks.md"
+    validation:
+      - "work_class maps to migration policy"
+      - "migration plan declares compatibility window and rollback strategy"
+  spike:
+    required_artifacts:
+      - "spike-note.md"
+    validation:
+      - "work_class maps to spike policy"
+      - "tasks.md may be omitted for exploratory work"
+  modify:
+    required_artifacts:
+      - "modify-plan.md"
+    optional_artifacts:
+      - "tasks.md"
+    validation:
+      - "work_class maps to modify policy"
+      - "impact analysis and regression testing sections are present in plan"
+  hotfix:
+    required_artifacts:
+      - "hotfix-report.md"
+    optional_artifacts:
+      - "tasks.md"
+    validation:
+      - "work_class maps to hotfix policy"
+      - "incident traceability is declared in plan frontmatter"
+  deprecate:
+    required_artifacts:
+      - "deprecate-plan.md"
+      - "tasks.md"
+    validation:
+      - "work_class maps to deprecate policy"
+      - "plan documents phased compatibility and removal path"
+      - "plan includes dependency impact and consumer rollout details"
 
 legacy_compatibility:
   plan_filename_work_class:

@@ -36,6 +36,31 @@ provides:
       description: "Lightweight plan template for scoped patch-level changes"
 
     - type: "template"
+      name: "migration-plan"
+      file: "templates/migration-plan-template.md"
+      description: "Migration-focused plan template for phased technical transitions"
+
+    - type: "template"
+      name: "spike-note"
+      file: "templates/spike-note-template.md"
+      description: "Exploratory note template for short research spikes"
+
+    - type: "template"
+      name: "modify-plan"
+      file: "templates/modify-plan-template.md"
+      description: "Behavior-change plan template for scoped modifications to existing functionality"
+
+    - type: "template"
+      name: "hotfix-report"
+      file: "templates/hotfix-report-template.md"
+      description: "Incident-linked report template for urgent and minimal hotfix delivery"
+
+    - type: "template"
+      name: "deprecate-plan"
+      file: "templates/deprecate-plan-template.md"
+      description: "Deprecation plan template with dependency-impact and phased rollout tracking"
+
+    - type: "template"
       name: "test-strategy"
       file: "templates/test-strategy-template.md"
       description: "Standalone test strategy document for feature or project scope"

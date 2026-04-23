@@ -48,6 +48,11 @@ Domain-specific patterns are layered on top during initialization based on the s
 - `architecture-decision-record-template.md`: Standard ADR format
 - `system-design-plan-template.md`: Mandatory template for the `/speckit.plan` phase
 - `patch-plan-template.md`: Lightweight plan template for scoped patch-level changes
+- `migration-plan-template.md`: Migration-focused plan template for phased transitions
+- `spike-note-template.md`: Exploratory note template for short investigation spikes
+- `modify-plan-template.md`: Behavior-change plan template for scoped modifications
+- `hotfix-report-template.md`: Incident-linked template for urgent production fixes
+- `deprecate-plan-template.md`: Deprecation plan template with dependency-impact tracking
 - `execution-brief-template.md`: Compact agent-facing execution summary format
 - `test-strategy-template.md`: Standalone test strategy template for implementation planning
 - `qa-checklist-template.md`: QA checklist for implementation review and handoff

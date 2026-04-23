@@ -5,7 +5,7 @@ Delivery stages:
 1. Constitution (`/speckit.constitution`)
 2. Specify (`/speckit.specify`)
 3. Clarify (`/speckit.clarify`, optional)
-4. Plan (`/speckit.plan`) — read `.specify/pattern-index.md`, select relevant pattern files, and produce a System Design Plan (`system-design-plan-template.md`) or a patch/tool plan (`patch-plan-template.md`). In lazy knowledge mode, read full candidate pattern content from `.specify/.knowledge-store/` during planning.
+4. Plan (`/speckit.plan`) — read `.specify/pattern-index.md`, select relevant pattern files, and produce the work-class artifact required by policy. Supported artifacts include `system-design-plan`, `patch-plan`, `refactor-plan`, `bugfix-report`, `migration-plan`, `spike-note`, `modify-plan`, `hotfix-report`, and `deprecate-plan`. In lazy knowledge mode, read full candidate pattern content from `.specify/.knowledge-store/` during planning.
 5. **`after_plan` gate** — validates plan presence + mandatory sections; in lazy knowledge mode, materializes only selected pattern files into `.specify/`
 5b. **Execution brief refresh** — after plan/tasks/review checks, the orchestrator updates `.specify/context/execution-brief.md` as a compact agent-facing summary (additive, non-blocking).
 6. Tasks (`/speckit.tasks`) — produces **`tasks.md`** in the active feature directory using `tasks-template.md` as format reference. Every task **must** use `- [ ]` checkbox syntax.
@@ -75,16 +75,16 @@ Gate enforcement rules (mandatory sections, placeholder markers, retry limits) a
 
 | Hook | Fires After | Validates |
 |------|------------|-----------|
-| `after_plan` | `/speckit.plan` | Plan file exists; Full Plan requires Sections 4, 4b, 5, and 13 with real content; Patch Plan and Tool Plan require Sections 1 and 2 with real content. In lazy mode, selected pattern filenames are resolved from the knowledge manifest or local knowledge store. |
+| `after_plan` | `/speckit.plan` | Plan file exists; required sections for the resolved work-class policy are present with non-placeholder content; required traceability mode/id contract is valid. In lazy mode, selected pattern filenames are resolved from the knowledge manifest or local knowledge store. |
 | `after_tasks` | `/speckit.tasks` | At least one `tasks.md` exists in supported locations (`specs/**`, `.specify/`, or workspace root), and checkbox format is validated. |
-| `after_implement` | `/speckit.implement` | E2E test files exist and include assertions, then domain-specific validators run. Docker preflight connectivity is checked on every gate event when `execution_mode` is `docker-fallback`. |
+| `after_implement` | `/speckit.implement` | E2E test files exist and include assertions for work classes whose testing expectation is not `advisory`, then domain-specific validators run. Docker preflight connectivity is checked on every gate event when `execution_mode` is `docker-fallback`. |
 | `after_review` | Review completion | All tasks are marked complete, no outstanding Tier 2 findings remain in gate feedback, and E2E assertions are still present. |
 
 Execution-brief generation is intentionally additive and does not change gate pass/fail semantics.
 
 ## Testing validation rules
 
-During `after_implement`, the gate enforces baseline E2E testing hygiene:
+During `after_implement`, the gate enforces baseline E2E testing hygiene for non-advisory work classes:
 
 - At least one E2E test file must exist.
 - Allowed naming patterns:
@@ -102,6 +102,7 @@ During `after_implement`, the gate enforces baseline E2E testing hygiene:
 - Findings can include confidence metadata (`deterministic` or `heuristic`) and remediation ownership for triage.
 - By default, heuristic Tier 1 findings do not auto-escalate on retry unless `gate.heuristic_retry_escalates` is enabled.
 - Pre-action audit log entries are appended only for high-risk planned actions: major refactors, package install/remove activity, and high-risk ops/runtime changes.
+- Traceability frontmatter is validated by work class using `traceability_mode` + matching id (`requirement_id`, `invariant_id`, `risk_id`, `incident_id`, `adr_id`).
 
 ## Passive guidance vs. active validation
 

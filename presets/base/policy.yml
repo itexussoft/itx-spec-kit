@@ -15,6 +15,8 @@ work_classes:
     task_policy: required
     testing_expectation: e2e-required
     gate_profile: feature-strict
+    traceability_modes: [requirement, adr]
+    traceability_required: false
   patch:
     allowed_templates:
       - "patch-plan-template.md"
@@ -25,6 +27,8 @@ work_classes:
     task_policy: required
     testing_expectation: regression-required
     gate_profile: patch-safe
+    traceability_modes: [requirement, invariant, risk, incident, adr]
+    traceability_required: false
   refactor:
     allowed_templates:
       - "refactor-plan-template.md"
@@ -39,6 +43,8 @@ work_classes:
     task_policy: optional
     testing_expectation: regression-required
     gate_profile: refactor-safe
+    traceability_modes: [invariant, risk, adr]
+    traceability_required: false
   bugfix:
     allowed_templates:
       - "bugfix-report-template.md"
@@ -53,19 +59,24 @@ work_classes:
     task_policy: optional
     testing_expectation: regression-required
     gate_profile: bugfix-fast
+    traceability_modes: [incident, risk, requirement]
+    traceability_required: false
   migration:
     allowed_templates:
-      - "system-design-plan-template.md"
-      - "patch-plan-template.md"
+      - "migration-plan-template.md"
     mandatory_sections:
-      - "## 4. Architectural Patterns Applied"
-      - "## 4b. Code-Level Design Patterns Applied"
-      - "## 5. DDD Aggregates"
-      - "## 13. Test Strategy"
+      - "## 1. Migration Goal"
+      - "## 2. Current State / Target State"
+      - "## 3. Transition Plan"
+      - "## 4. Compatibility Window"
+      - "## 5. Rollback Strategy"
+      - "## 7. Regression and Verification"
     pattern_selection: required
     task_policy: required
     testing_expectation: e2e-required
-    gate_profile: feature-strict
+    gate_profile: migration-safe
+    traceability_modes: [invariant, risk, adr]
+    traceability_required: true
   tooling:
     allowed_templates:
       - "patch-plan-template.md"
@@ -76,16 +87,81 @@ work_classes:
     task_policy: required
     testing_expectation: regression-required
     gate_profile: patch-safe
+    traceability_modes: [requirement, risk, adr]
+    traceability_required: false
   spike:
     allowed_templates:
-      - "patch-plan-template.md"
+      - "spike-note-template.md"
     mandatory_sections:
-      - "## 1. Problem Statement"
-      - "## 2. Files / Modules Affected"
+      - "## 1. Question"
+      - "## 2. Constraints"
+      - "## 3. Options Explored"
+      - "## 4. Recommendation"
+      - "## 5. Next Decision"
     pattern_selection: optional
     task_policy: optional
     testing_expectation: advisory
     gate_profile: spike-light
+    traceability_modes: [risk, invariant]
+    traceability_required: false
+  modify:
+    allowed_templates:
+      - "modify-plan-template.md"
+    mandatory_sections:
+      - "## 1. Problem Statement"
+      - "## 2. Files / Modules Affected"
+      - "## 5. Regression Testing"
+    pattern_selection: optional
+    task_policy: optional
+    testing_expectation: regression-required
+    gate_profile: patch-safe
+    traceability_modes: [requirement, invariant, risk]
+    traceability_required: true
+  hotfix:
+    allowed_templates:
+      - "hotfix-report-template.md"
+    mandatory_sections:
+      - "## 1. Symptom"
+      - "## 2. Reproduction"
+      - "## 3. Expected Behavior"
+      - "## 4. Regression Test Target"
+      - "## 5. Root Cause"
+      - "## 6. Fix Strategy"
+    pattern_selection: optional
+    task_policy: optional
+    testing_expectation: regression-required
+    gate_profile: hotfix-fast
+    traceability_modes: [incident]
+    traceability_required: true
+  deprecate:
+    allowed_templates:
+      - "deprecate-plan-template.md"
+    mandatory_sections:
+      - "## 1. Migration Goal"
+      - "## 2. Current State / Target State"
+      - "## 3. Transition Plan"
+      - "## 4. Compatibility Window"
+      - "## 5. Rollback Strategy"
+      - "## 6. Dependency Impact and Consumer Rollout"
+      - "## 7. Regression and Verification"
+    pattern_selection: optional
+    task_policy: required
+    testing_expectation: e2e-required
+    gate_profile: migration-safe
+    traceability_modes: [adr, requirement]
+    traceability_required: true
+
+traceability_modes:
+  requirement:
+    id_field: requirement_id
+  invariant:
+    id_field: invariant_id
+  risk:
+    id_field: risk_id
+  incident:
+    id_field: incident_id
+  adr:
+    id_field: adr_id
 
 # Compatibility map used when frontmatter metadata is absent or invalid.
 legacy_plan_filename_work_class:

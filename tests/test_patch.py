@@ -170,7 +170,17 @@ class PatchTests(unittest.TestCase):
             ws = self._make_bootstrapped_workspace(tmp)
             patch_mod.patch_workspace(ROOT, ws)
             tasks_tpl = ws / ".specify" / "templates" / "tasks-template.md"
+            migration_tpl = ws / ".specify" / "templates" / "migration-plan-template.md"
+            spike_tpl = ws / ".specify" / "templates" / "spike-note-template.md"
+            modify_tpl = ws / ".specify" / "templates" / "modify-plan-template.md"
+            hotfix_tpl = ws / ".specify" / "templates" / "hotfix-report-template.md"
+            deprecate_tpl = ws / ".specify" / "templates" / "deprecate-plan-template.md"
             self.assertTrue(tasks_tpl.exists())
+            self.assertTrue(migration_tpl.exists())
+            self.assertTrue(spike_tpl.exists())
+            self.assertTrue(modify_tpl.exists())
+            self.assertTrue(hotfix_tpl.exists())
+            self.assertTrue(deprecate_tpl.exists())
             self.assertIn("- [ ]", tasks_tpl.read_text(encoding="utf-8"))
 
     # ---- fix_tasks_checkboxes ----

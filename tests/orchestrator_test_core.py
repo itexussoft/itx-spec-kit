@@ -208,6 +208,111 @@ class OrchestratorTests(unittest.TestCase):
             self.assertTrue(feedback.exists())
             self.assertIn("tasks-presence", feedback.read_text(encoding="utf-8"))
 
+    def test_after_tasks_modify_plan_without_tasks_is_allowed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-modify").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-modify" / "modify-plan.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: modify",
+                        "traceability_mode: requirement",
+                        "requirement_id: REQ-100",
+                        "---",
+                        "# Modify plan",
+                        "## 1. Problem Statement",
+                        "Change validation behavior for existing endpoint.",
+                        "## 2. Files / Modules Affected",
+                        "- src/service.py",
+                        "## 5. Regression Testing",
+                        "- add regression",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_tasks")
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Gates passed", result.stdout)
+
+    def test_after_tasks_hotfix_report_without_tasks_is_allowed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-hotfix").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-hotfix" / "hotfix-report.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: hotfix",
+                        "traceability_mode: incident",
+                        "incident_id: INC-1",
+                        "---",
+                        "# Hotfix report",
+                        "## 1. Symptom",
+                        "- Service returns 500",
+                        "## 2. Reproduction",
+                        "1. Send malformed request",
+                        "2. Observe 500",
+                        "## 3. Expected Behavior",
+                        "- Return 400",
+                        "## 4. Regression Test Target",
+                        "- Add regression",
+                        "## 5. Root Cause",
+                        "- Missing guard",
+                        "## 6. Fix Strategy",
+                        "- Add guard",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_tasks")
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Gates passed", result.stdout)
+
+    def test_after_tasks_deprecate_plan_without_tasks_requires_tasks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-deprecate").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-deprecate" / "deprecate-plan.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: deprecate",
+                        "traceability_mode: adr",
+                        "adr_id: ADR-99",
+                        "---",
+                        "# Deprecate plan",
+                        "## 1. Migration Goal",
+                        "Deprecate endpoint.",
+                        "## 2. Current State / Target State",
+                        "- Current and target states documented",
+                        "## 3. Transition Plan",
+                        "- staged warnings",
+                        "## 4. Compatibility Window",
+                        "- one release",
+                        "## 5. Rollback Strategy",
+                        "- flag rollback",
+                        "## 7. Regression and Verification",
+                        "- compatibility checks",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_tasks")
+            self.assertEqual(result.returncode, 0)
+            feedback = ws / ".specify" / "context" / "gate_feedback.md"
+            self.assertTrue(feedback.exists())
+            self.assertIn("tasks-presence", feedback.read_text(encoding="utf-8"))
+
     def test_after_tasks_active_bugfix_scope_ignores_other_feature_plans(self):
         with tempfile.TemporaryDirectory() as tmp:
             ws = Path(tmp)
@@ -538,6 +643,33 @@ class OrchestratorTests(unittest.TestCase):
             feedback = ws / ".specify" / "context" / "gate_feedback.md"
             self.assertTrue(feedback.exists())
             self.assertIn("plan-section-placeholder", feedback.read_text(encoding="utf-8"))
+
+    def test_after_plan_authored_italic_content_is_not_placeholder(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-a").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-a" / "system-design-plan.md").write_text(
+                "\n".join(
+                    [
+                        "# Plan",
+                        "## 4. Architectural Patterns Applied",
+                        "_Define idempotency guarantees for retry-safe order updates._",
+                        "## 4b. Code-Level Design Patterns Applied",
+                        "- Command handler with optimistic locking",
+                        "## 5. DDD Aggregates",
+                        "- Order aggregate enforces status-transition invariants",
+                        "## 13. Test Strategy",
+                        "- Add regression test for duplicate retry events",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Gates passed", result.stdout)
 
     def test_after_plan_missing_4b_returns_tier1_continue(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1079,15 +1211,24 @@ class OrchestratorTests(unittest.TestCase):
                     [
                         "---",
                         "work_class: migration",
+                        "traceability_mode: invariant",
+                        "invariant_id: INV-101",
                         "---",
                         "# Migration plan",
-                        "## 4. Architectural Patterns Applied",
-                        "- Incremental migration with bounded-context boundaries",
-                        "## 4b. Code-Level Design Patterns Applied",
-                        "- Adapter + anti-corruption layer",
-                        "## 5. DDD Aggregates",
-                        "- Account aggregate remains source of truth",
-                        "## 13. Test Strategy",
+                        "## 1. Migration Goal",
+                        "Transition ledger read path to unified snapshot store.",
+                        "## 2. Current State / Target State",
+                        "- Current: dual read paths",
+                        "- Target: single snapshot-backed read path",
+                        "## 3. Transition Plan",
+                        "- Phase 1: dual-write",
+                        "- Phase 2: shadow reads",
+                        "- Phase 3: cutover",
+                        "## 4. Compatibility Window",
+                        "- Keep legacy read endpoint for two releases",
+                        "## 5. Rollback Strategy",
+                        "- Feature flag rollback to legacy path",
+                        "## 7. Regression and Verification",
                         "- E2E and rollback validation",
                         "",
                     ]
@@ -1114,10 +1255,17 @@ class OrchestratorTests(unittest.TestCase):
                         "work_class: spike",
                         "---",
                         "# Spike note",
-                        "## 1. Problem Statement",
-                        "Evaluate two candidate storage engines under current constraints",
-                        "## 2. Files / Modules Affected",
-                        "- docs/spike-notes/storage-options.md",
+                        "## 1. Question",
+                        "Should we use snapshot polling or event stream replay for migration validation?",
+                        "## 2. Constraints",
+                        "- Must complete in one iteration",
+                        "## 3. Options Explored",
+                        "- Option A: polling",
+                        "- Option B: replay",
+                        "## 4. Recommendation",
+                        "- Prefer replay with bounded scope",
+                        "## 5. Next Decision",
+                        "- Decide implementation slice for validation harness",
                         "",
                     ]
                 ),
@@ -1158,6 +1306,344 @@ class OrchestratorTests(unittest.TestCase):
             feedback = ws / ".specify" / "context" / "gate_feedback.md"
             if feedback.exists():
                 self.assertNotIn("plan-presence", feedback.read_text(encoding="utf-8"))
+
+    def test_after_plan_modify_plan_with_work_class_is_discovered(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-modify").mkdir(parents=True, exist_ok=True)
+            template = (ROOT / "presets" / "base" / "templates" / "modify-plan-template.md").read_text(encoding="utf-8")
+            rendered = template.replace('requirement_id: ""', 'requirement_id: "REQ-212"')
+            rendered = rendered.replace(
+                "_One short paragraph describing the behavior change request._",
+                "Adjust refund validation behavior for partial captures.",
+            )
+            rendered = rendered.replace(
+                "_List impacted files, modules, or services and the expected scope of edits._",
+                "- src/refunds/service.py\n- tests/test_refunds.py",
+            )
+            rendered = rendered.replace(
+                "_At minimum, declare one regression test that covers the changed behavior path._",
+                "- Add integration regression for partial capture validation.",
+            )
+            rendered = rendered.replace(
+                "| _e.g., Validation rule tightened_ | _E2E or integration_ | _e.g., `e2e_test_validation.py`_ |",
+                "| Partial-capture validation path | Integration | tests/test_refunds.py |",
+            )
+            (ws / "specs" / "feature-modify" / "modify-plan.md").write_text(rendered, encoding="utf-8")
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Gates passed", result.stdout)
+            brief = ws / ".specify" / "context" / "execution-brief.md"
+            self.assertTrue(brief.exists())
+            self.assertIn('work_class: "modify"', brief.read_text(encoding="utf-8"))
+
+    def test_after_plan_hotfix_report_with_work_class_is_discovered(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-hotfix").mkdir(parents=True, exist_ok=True)
+            template = (ROOT / "presets" / "base" / "templates" / "hotfix-report-template.md").read_text(encoding="utf-8")
+            rendered = template.replace('incident_id: ""', 'incident_id: "INC-4451"')
+            rendered = rendered.replace(
+                "_Describe the observed failure, including user/system impact._",
+                "Checkout endpoint crashes when promo token is expired.",
+            )
+            rendered = rendered.replace(
+                "_Provide deterministic reproduction steps and environment context._",
+                "Repro in staging with expired promo token payload.",
+            )
+            rendered = rendered.replace("1. _Step one_", "1. Submit checkout payload with expired promo token.")
+            rendered = rendered.replace("2. _Step two_", "2. Observe HTTP 500 response from checkout endpoint.")
+            rendered = rendered.replace("3. _Observed result_", "3. Logs show null guard failure in promo validator.")
+            rendered = rendered.replace(
+                "_State the expected correct behavior for the same flow._",
+                "Endpoint should return HTTP 400 with validation error.",
+            )
+            rendered = rendered.replace(
+                "_Name the concrete regression test(s) that will prevent recurrence._",
+                "Add integration regression for expired promo token checkout path.",
+            )
+            rendered = rendered.replace("| | | |", "| Expired promo token checkout | Integration | tests/test_checkout.py |")
+            rendered = rendered.replace(
+                "_Summarize the technical root cause and affected code path._",
+                "Missing null/expiry guard in promo validator path.",
+            )
+            rendered = rendered.replace(
+                "_Describe the minimal correction approach and why it is safe._",
+                "Add explicit guard and map failure to validation error response.",
+            )
+            (ws / "specs" / "feature-hotfix" / "hotfix-report.md").write_text(rendered, encoding="utf-8")
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Gates passed", result.stdout)
+            brief = ws / ".specify" / "context" / "execution-brief.md"
+            self.assertTrue(brief.exists())
+            self.assertIn('work_class: "hotfix"', brief.read_text(encoding="utf-8"))
+
+    def test_after_plan_deprecate_plan_with_work_class_is_discovered(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-deprecate").mkdir(parents=True, exist_ok=True)
+            template = (ROOT / "presets" / "base" / "templates" / "deprecate-plan-template.md").read_text(encoding="utf-8")
+            rendered = template.replace('adr_id: ""', 'adr_id: "ADR-0042"')
+            rendered = rendered.replace(
+                "_State what is being deprecated and the target replacement state._",
+                "Deprecate v1 balance endpoint and standardize on v2.",
+            )
+            rendered = rendered.replace(
+                "_Describe the before and after states at a system level._",
+                "Current: clients use v1 and v2. Target: clients use only v2.",
+            )
+            rendered = rendered.replace(
+                "_List phased steps for warn -> disable -> remove rollout._",
+                "- Phase 1 warn\n- Phase 2 disable by default\n- Phase 3 remove route",
+            )
+            rendered = rendered.replace(
+                "_Define compatibility duration and explicit exit criteria._",
+                "One release of warning mode, then disable once top consumers migrate.",
+            )
+            rendered = rendered.replace(
+                "_Define rollback triggers, mechanics, and recovery path._",
+                "Rollback by re-enabling v1 route behind feature flag.",
+            )
+            rendered = rendered.replace(
+                "_List dependent services, clients, and owners, plus their migration order and communication plan._",
+                "Track top client integrations and migrate in dependency order.",
+            )
+            rendered = rendered.replace(
+                "| | | | |",
+                "| Mobile API client | API Team | Move to v2 contract | 2026-06-01 |",
+            )
+            rendered = rendered.replace(
+                "_List regression and verification checks required before and after cutover._",
+                "- Contract and E2E checks for v2-only flow.",
+            )
+            rendered = rendered.replace(
+                "| | | |",
+                "| Balance API compatibility | E2E | tests/e2e_balance_v2.py |",
+            )
+            (ws / "specs" / "feature-deprecate" / "deprecate-plan.md").write_text(rendered, encoding="utf-8")
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Gates passed", result.stdout)
+            brief = ws / ".specify" / "context" / "execution-brief.md"
+            self.assertTrue(brief.exists())
+            self.assertIn('work_class: "deprecate"', brief.read_text(encoding="utf-8"))
+
+    def test_after_plan_hotfix_template_scaffold_is_placeholder(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-hotfix").mkdir(parents=True, exist_ok=True)
+            template = (ROOT / "presets" / "base" / "templates" / "hotfix-report-template.md").read_text(encoding="utf-8")
+            rendered = template.replace('incident_id: ""', 'incident_id: "INC-999"')
+            (ws / "specs" / "feature-hotfix" / "hotfix-report.md").write_text(rendered, encoding="utf-8")
+
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            feedback = ws / ".specify" / "context" / "gate_feedback.md"
+            self.assertTrue(feedback.exists())
+            self.assertIn("plan-section-placeholder", feedback.read_text(encoding="utf-8"))
+
+    def test_after_plan_deprecate_template_scaffold_is_placeholder(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-deprecate").mkdir(parents=True, exist_ok=True)
+            template = (ROOT / "presets" / "base" / "templates" / "deprecate-plan-template.md").read_text(encoding="utf-8")
+            rendered = template.replace('adr_id: ""', 'adr_id: "ADR-1000"')
+            (ws / "specs" / "feature-deprecate" / "deprecate-plan.md").write_text(rendered, encoding="utf-8")
+
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            feedback = ws / ".specify" / "context" / "gate_feedback.md"
+            self.assertTrue(feedback.exists())
+            self.assertIn("plan-section-placeholder", feedback.read_text(encoding="utf-8"))
+
+    def test_after_plan_deprecate_plan_missing_dependency_section_is_tier1(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-deprecate").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-deprecate" / "deprecate-plan.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: deprecate",
+                        "traceability_mode: adr",
+                        "adr_id: ADR-0042",
+                        "---",
+                        "# Deprecate plan",
+                        "## 1. Migration Goal",
+                        "Deprecate v1 balance endpoint.",
+                        "## 2. Current State / Target State",
+                        "- Current: v1 + v2 endpoints",
+                        "- Target: v2 only",
+                        "## 3. Transition Plan",
+                        "- Warn -> disable -> remove",
+                        "## 4. Compatibility Window",
+                        "- Keep warning mode for one release",
+                        "## 5. Rollback Strategy",
+                        "- Re-enable v1 route via feature flag",
+                        "## 7. Regression and Verification",
+                        "- E2E compatibility and removal checks",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            feedback = ws / ".specify" / "context" / "gate_feedback.md"
+            self.assertTrue(feedback.exists())
+            self.assertIn("plan-section-missing", feedback.read_text(encoding="utf-8"))
+
+    def test_after_plan_required_traceability_missing_for_migration(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-migration").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-migration" / "migration-plan.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: migration",
+                        "---",
+                        "# Migration plan",
+                        "## 1. Migration Goal",
+                        "Move billing reads to snapshot table.",
+                        "## 2. Current State / Target State",
+                        "- Current and target documented",
+                        "## 3. Transition Plan",
+                        "- staged rollout",
+                        "## 4. Compatibility Window",
+                        "- two releases",
+                        "## 5. Rollback Strategy",
+                        "- feature-flag rollback",
+                        "## 7. Regression and Verification",
+                        "- regression checks",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            feedback = ws / ".specify" / "context" / "gate_feedback.md"
+            self.assertTrue(feedback.exists())
+            self.assertIn("plan-traceability-missing", feedback.read_text(encoding="utf-8"))
+
+    def test_after_plan_disallowed_traceability_mode_for_hotfix(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-hotfix").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-hotfix" / "hotfix-report.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: hotfix",
+                        "traceability_mode: requirement",
+                        "requirement_id: REQ-1",
+                        "---",
+                        "# Hotfix report",
+                        "## 1. Symptom",
+                        "- Service returns 500",
+                        "## 2. Reproduction",
+                        "1. Send malformed payload",
+                        "2. Observe 500",
+                        "## 3. Expected Behavior",
+                        "- Return 400",
+                        "## 4. Regression Test Target",
+                        "- Add integration regression",
+                        "## 5. Root Cause",
+                        "- Missing guard",
+                        "## 6. Fix Strategy",
+                        "- Add guard",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            feedback = ws / ".specify" / "context" / "gate_feedback.md"
+            self.assertTrue(feedback.exists())
+            self.assertIn("plan-traceability-mode-disallowed", feedback.read_text(encoding="utf-8"))
+
+    def test_after_plan_traceability_id_missing_for_mode(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-modify").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-modify" / "modify-plan.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: modify",
+                        "traceability_mode: requirement",
+                        "---",
+                        "# Modify plan",
+                        "## 1. Problem Statement",
+                        "Change behavior",
+                        "## 2. Files / Modules Affected",
+                        "- src/service.py",
+                        "## 5. Regression Testing",
+                        "- add regression",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            feedback = ws / ".specify" / "context" / "gate_feedback.md"
+            self.assertTrue(feedback.exists())
+            self.assertIn("plan-traceability-id-missing", feedback.read_text(encoding="utf-8"))
+
+    def test_after_plan_traceability_id_ambiguous(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-modify").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-modify" / "modify-plan.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: modify",
+                        "traceability_mode: requirement",
+                        "requirement_id: REQ-200",
+                        "risk_id: RISK-200",
+                        "---",
+                        "# Modify plan",
+                        "## 1. Problem Statement",
+                        "Change behavior",
+                        "## 2. Files / Modules Affected",
+                        "- src/service.py",
+                        "## 5. Regression Testing",
+                        "- add regression",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            feedback = ws / ".specify" / "context" / "gate_feedback.md"
+            self.assertTrue(feedback.exists())
+            self.assertIn("plan-traceability-id-ambiguous", feedback.read_text(encoding="utf-8"))
 
     def test_after_plan_non_legacy_name_without_frontmatter_is_tier1_missing_work_class(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1450,6 +1936,22 @@ class OrchestratorTests(unittest.TestCase):
             self.assertTrue(feedback.exists())
             self.assertIn("knowledge-pattern-selection-missing", feedback.read_text(encoding="utf-8"))
 
+    def test_after_plan_lazy_mode_migration_template_with_selection_block_is_accepted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base", knowledge_mode="lazy")
+            write_policy(ws)
+            (ws / "specs" / "feature-migration").mkdir(parents=True, exist_ok=True)
+            template = (ROOT / "presets" / "base" / "templates" / "migration-plan-template.md").read_text(encoding="utf-8")
+            rendered = template.replace('invariant_id: ""', 'invariant_id: "INV-901"')
+            (ws / "specs" / "feature-migration" / "migration-plan.md").write_text(rendered, encoding="utf-8")
+
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            feedback = ws / ".specify" / "context" / "gate_feedback.md"
+            if feedback.exists():
+                self.assertNotIn("knowledge-pattern-selection-missing", feedback.read_text(encoding="utf-8"))
+
     def test_after_plan_lazy_mode_non_legacy_feature_work_class_requires_selection(self):
         with tempfile.TemporaryDirectory() as tmp:
             ws = Path(tmp)
@@ -1663,7 +2165,7 @@ class OrchestratorTests(unittest.TestCase):
         self.assertIsInstance(data, dict)
         work_classes = data.get("work_classes")
         self.assertIsInstance(work_classes, dict)
-        expected_classes = {"feature", "patch", "refactor", "bugfix", "migration", "tooling", "spike"}
+        expected_classes = {"feature", "patch", "refactor", "bugfix", "migration", "tooling", "spike", "modify", "hotfix", "deprecate"}
         self.assertTrue(expected_classes.issubset(set(work_classes.keys())))
 
         required_fields = {
@@ -1704,10 +2206,30 @@ class OrchestratorTests(unittest.TestCase):
         self.assertIn("---", bugfix_text)
         self.assertIn("work_class: bugfix", bugfix_text)
 
+    def test_wave_d_templates_include_work_class_and_traceability_scaffold(self):
+        migration_text = (ROOT / "presets" / "base" / "templates" / "migration-plan-template.md").read_text(encoding="utf-8")
+        modify_text = (ROOT / "presets" / "base" / "templates" / "modify-plan-template.md").read_text(encoding="utf-8")
+        hotfix_text = (ROOT / "presets" / "base" / "templates" / "hotfix-report-template.md").read_text(encoding="utf-8")
+        deprecate_text = (ROOT / "presets" / "base" / "templates" / "deprecate-plan-template.md").read_text(encoding="utf-8")
+
+        self.assertIn("work_class: migration", migration_text)
+        self.assertIn("traceability_mode:", migration_text)
+        self.assertIn("work_class: modify", modify_text)
+        self.assertIn("requirement_id:", modify_text)
+        self.assertIn("work_class: hotfix", hotfix_text)
+        self.assertIn("incident_id:", hotfix_text)
+        self.assertIn("work_class: deprecate", deprecate_text)
+        self.assertIn("## 6. Dependency Impact and Consumer Rollout", deprecate_text)
+
     def test_input_contract_plan_templates_reference_system_design_name(self):
         contracts_path = ROOT / "presets" / "base" / "input-contracts.yml"
         text = contracts_path.read_text(encoding="utf-8")
         self.assertIn("system-design-plan-template.md", text)
+        self.assertIn("migration-plan-template.md", text)
+        self.assertIn("spike-note-template.md", text)
+        self.assertIn("modify-plan-template.md", text)
+        self.assertIn("hotfix-report-template.md", text)
+        self.assertIn("deprecate-plan-template.md", text)
         self.assertNotIn("full-plan-template.md", text)
 
     def test_input_contract_tasks_are_conditional_for_wave_b_work_classes(self):
@@ -1956,6 +2478,41 @@ class OrchestratorTests(unittest.TestCase):
             feedback = ws / ".specify" / "context" / "gate_feedback.md"
             self.assertTrue(feedback.exists())
             self.assertIn("e2e-test-presence", feedback.read_text(encoding="utf-8"))
+
+    def test_after_implement_spike_plan_skips_e2e_presence_requirement(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-spike").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-spike" / "spike-note.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: spike",
+                        "traceability_mode: risk",
+                        "risk_id: RISK-200",
+                        "---",
+                        "# Spike note",
+                        "## 1. Question",
+                        "Can we safely remove legacy cache fallback?",
+                        "## 2. Constraints",
+                        "- Time-boxed investigation",
+                        "## 3. Options Explored",
+                        "- Keep fallback",
+                        "- Remove fallback",
+                        "## 4. Recommendation",
+                        "- Remove behind feature flag",
+                        "## 5. Next Decision",
+                        "- Decide implementation slice",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_implement")
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Gates passed", result.stdout)
 
     def test_after_implement_e2e_test_present_passes(self):
         with tempfile.TemporaryDirectory() as tmp:

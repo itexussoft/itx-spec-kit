@@ -151,6 +151,152 @@ class OrchestratorWaveCTests(unittest.TestCase):
             self.assertIn("T001 update", text)
             self.assertNotIn("T002 add docs note", text)
 
+    def test_after_plan_execution_brief_includes_traceability_snapshot(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+            (ws / "specs" / "feature-hotfix").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-hotfix" / "hotfix-report.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: hotfix",
+                        "traceability_mode: incident",
+                        "incident_id: INC-412",
+                        "---",
+                        "# Hotfix report",
+                        "## 1. Symptom",
+                        "- Endpoint returns 500",
+                        "## 2. Reproduction",
+                        "1. Send malformed payload",
+                        "2. Observe 500",
+                        "## 3. Expected Behavior",
+                        "- Return 400",
+                        "## 4. Regression Test Target",
+                        "- Add integration regression",
+                        "## 5. Root Cause",
+                        "- Missing guard",
+                        "## 6. Fix Strategy",
+                        "- Add guard",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            brief = ws / ".specify" / "context" / "execution-brief.md"
+            self.assertTrue(brief.exists())
+            text = brief.read_text(encoding="utf-8")
+            self.assertIn("## Traceability", text)
+            self.assertIn("Mode: incident", text)
+            self.assertIn("INC-412", text)
+
+    def test_after_plan_execution_brief_wave_d_heading_coverage(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+
+            (ws / "specs" / "feature-migration").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-migration" / "migration-plan.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: migration",
+                        "traceability_mode: invariant",
+                        "invariant_id: INV-700",
+                        "---",
+                        "# Migration plan",
+                        "## 1. Migration Goal",
+                        "Move read path to v2 storage adapter.",
+                        "## 2. Current State / Target State",
+                        "- Current: v1 adapter",
+                        "- Target: v2 adapter",
+                        "## 4. Compatibility Window",
+                        "- Keep v1 fallback for one release",
+                        "## 5. Rollback Strategy",
+                        "- Toggle feature flag to restore v1 adapter",
+                        "## 7. Regression and Verification",
+                        "- Add integration regression for v2 read path",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            write_workflow_state_feature(ws, "feature-migration")
+            self.assertEqual(self.run_gate(ws, "after_plan").returncode, 0)
+            migration_brief = (ws / ".specify" / "context" / "execution-brief.md").read_text(encoding="utf-8")
+            self.assertIn("Move read path to v2 storage adapter.", migration_brief)
+            self.assertIn("Keep v1 fallback for one release", migration_brief)
+            self.assertIn("Add integration regression for v2 read path", migration_brief)
+
+            (ws / "specs" / "feature-spike").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-spike" / "spike-note.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: spike",
+                        "---",
+                        "# Spike note",
+                        "## 1. Question",
+                        "Can event replay replace snapshot polling safely?",
+                        "## 2. Constraints",
+                        "- One-day timebox",
+                        "## 3. Options Explored",
+                        "- Replay and polling comparison",
+                        "## 4. Recommendation",
+                        "- Prefer replay with guardrails",
+                        "## 5. Next Decision",
+                        "- Decide implementation pilot",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            write_workflow_state_feature(ws, "feature-spike")
+            self.assertEqual(self.run_gate(ws, "after_plan").returncode, 0)
+            spike_brief = (ws / ".specify" / "context" / "execution-brief.md").read_text(encoding="utf-8")
+            self.assertIn("Can event replay replace snapshot polling safely?", spike_brief)
+            self.assertIn("## Constraints and Invariants", spike_brief)
+            self.assertIn("One-day timebox", spike_brief)
+            self.assertNotIn("- In: One-day timebox", spike_brief)
+
+            (ws / "specs" / "feature-deprecate").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-deprecate" / "deprecate-plan.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: deprecate",
+                        "traceability_mode: adr",
+                        "adr_id: ADR-88",
+                        "---",
+                        "# Deprecation plan",
+                        "## 1. Migration Goal",
+                        "Deprecate v1 webhook endpoint.",
+                        "## 2. Current State / Target State",
+                        "- Current: v1 and v2",
+                        "- Target: v2 only",
+                        "## 5. Rollback Strategy",
+                        "- Restore v1 route behind flag",
+                        "## 7. Regression and Verification",
+                        "- Add E2E regression for v2-only webhook path",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            write_workflow_state_feature(ws, "feature-deprecate")
+            self.assertEqual(self.run_gate(ws, "after_plan").returncode, 0)
+            deprecate_brief = (ws / ".specify" / "context" / "execution-brief.md").read_text(encoding="utf-8")
+            self.assertIn("Deprecate v1 webhook endpoint.", deprecate_brief)
+            self.assertIn("Add E2E regression for v2-only webhook path", deprecate_brief)
+
     def test_after_plan_major_refactor_creates_audit_log(self):
         with tempfile.TemporaryDirectory() as tmp:
             ws = Path(tmp)

@@ -1,7 +1,9 @@
 ---
 schema_version: "1.0"
 feature: "<feature-slug>"
-work_class: "<feature|patch|refactor|bugfix|migration|tooling|spike>"
+work_class: "<feature|patch|refactor|bugfix|migration|tooling|spike|modify|hotfix|deprecate>"
+traceability_mode: "<requirement|invariant|risk|incident|adr|none>"
+traceability_ref: "<requirement_id|invariant_id|risk_id|incident_id|adr_id|n/a>"
 domain: "<base|fintech-trading|fintech-banking|healthcare|saas-platform>"
 knowledge_mode: "<lazy|eager>"
 generated_from:
@@ -44,6 +46,10 @@ generated_at: "YYYY-MM-DDTHH:MM:SS+00:00"
 
 ## Active Risks and Gate Signals
 - <max 5 bullets, concise summary only>
+
+## Traceability
+- Mode: <traceability mode used for this artifact>
+- Reference: <matching traceability id>
 
 ## Verification Targets
 - <tests to preserve and/or add>

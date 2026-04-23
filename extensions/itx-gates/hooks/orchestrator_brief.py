@@ -29,7 +29,9 @@ from orchestrator_common import (
     _load_active_feature_from_workflow_state,
     _resolve_legacy_work_class,
     _resolve_plan_policy_entry,
+    _split_frontmatter,
     _task_files_for_execution_brief_scope,
+    _traceability_mode_id_fields,
     load_knowledge_manifest,
 )
 
@@ -54,6 +56,12 @@ def _plan_priority(path: Path) -> int:
         return 5
     if "spike-note" in lower_name:
         return 6
+    if "modify-plan" in lower_name:
+        return 7
+    if "hotfix-report" in lower_name:
+        return 8
+    if "deprecate-plan" in lower_name:
+        return 9
     return 99
 
 
@@ -183,6 +191,8 @@ def _format_execution_brief(
     *,
     feature: str,
     work_class: str,
+    traceability_mode: str,
+    traceability_ref: str,
     domain: str,
     knowledge_mode: str,
     generated_from: List[str],
@@ -204,6 +214,8 @@ def _format_execution_brief(
         'schema_version: "1.0"',
         f'feature: "{feature}"',
         f'work_class: "{work_class}"',
+        f'traceability_mode: "{traceability_mode}"',
+        f'traceability_ref: "{traceability_ref}"',
         f'domain: "{domain}"',
         f'knowledge_mode: "{knowledge_mode}"',
         "generated_from:",
@@ -250,6 +262,9 @@ def _format_execution_brief(
     if risks:
         lines.extend(["", "## Active Risks and Gate Signals"])
         lines.extend([f"- {item}" for item in risks[:5]])
+    lines.extend(["", "## Traceability"])
+    lines.append(f"- Mode: {traceability_mode}")
+    lines.append(f"- Reference: {traceability_ref}")
     lines.extend(["", "## Verification Targets"])
     lines.extend([f"- {item}" for item in verification[:8]] or ["- Preserve existing gate checks and ensure regression coverage for changed behavior paths."])
     if next_actions:
@@ -366,7 +381,7 @@ def _derive_targeted_overlays(
             "Security/rate-limiting: define bounded request policies for sensitive or public endpoints."
         )
 
-    modify_like_patch = work_class in {"patch", "tooling"} and any(
+    modify_like_patch = work_class in {"patch", "tooling", "modify"} and any(
         marker in lowered for marker in ("modify", "behavior change", "change existing")
     )
     behavior_change_markers = (
@@ -582,9 +597,21 @@ def _generate_execution_brief(workspace: Path, config: Dict[str, Any], policy: D
         return
 
     plan_text = plan_path.read_text(encoding="utf-8", errors="ignore")
+    frontmatter, _ = _split_frontmatter(plan_text)
     sections = _extract_markdown_h2_sections(plan_text)
     _, resolved_work_class = _resolve_plan_policy_entry(plan_path, policy)
     work_class = resolved_work_class or _resolve_legacy_work_class(plan_path, policy) or "unknown"
+    traceability_mode = "none"
+    traceability_ref = "n/a"
+    mode_to_id_field = _traceability_mode_id_fields(policy)
+    raw_traceability_mode = frontmatter.get("traceability_mode")
+    if isinstance(raw_traceability_mode, str) and raw_traceability_mode.strip():
+        traceability_mode = raw_traceability_mode.strip().lower()
+        id_field = mode_to_id_field.get(traceability_mode)
+        if id_field:
+            raw_ref = frontmatter.get(id_field)
+            if isinstance(raw_ref, str) and raw_ref.strip():
+                traceability_ref = raw_ref.strip()
     feature = _infer_feature_from_plan(workspace, plan_path)
     domain = str(config.get("domain", "base")).strip() or "base"
     knowledge_mode = str((config.get("knowledge") or {}).get("mode", "eager")).strip().lower() or "eager"
@@ -598,7 +625,13 @@ def _generate_execution_brief(workspace: Path, config: Dict[str, Any], policy: D
         selected_patterns = ["none"]
 
     objective: List[str] = []
-    for heading in ("## 1. Problem Statement", "## 1. Goal", "## 1. Symptom"):
+    for heading in (
+        "## 1. Problem Statement",
+        "## 1. Goal",
+        "## 1. Symptom",
+        "## 1. Migration Goal",
+        "## 1. Question",
+    ):
         body = sections.get(heading)
         if body:
             objective.extend(_parse_compact_lines(body, limit=3))
@@ -606,7 +639,12 @@ def _generate_execution_brief(workspace: Path, config: Dict[str, Any], policy: D
 
     in_scope: List[str] = []
     out_scope: List[str] = []
-    for scope_heading in ("## 2. Scope / Non-Scope", "## 2. Files / Modules Affected", "## 2. Reproduction"):
+    for scope_heading in (
+        "## 2. Scope / Non-Scope",
+        "## 2. Files / Modules Affected",
+        "## 2. Reproduction",
+        "## 2. Current State / Target State",
+    ):
         body = sections.get(scope_heading)
         if not body:
             continue
@@ -631,13 +669,22 @@ def _generate_execution_brief(workspace: Path, config: Dict[str, Any], policy: D
         "## 5. Behavioral Equivalence Strategy",
         "## 3. Expected Behavior",
         "## 6. Fix Strategy",
+        "## 4. Compatibility Window",
+        "## 5. Rollback Strategy",
+        "## 2. Constraints",
     ):
         body = sections.get(heading)
         if body:
             constraints.extend(_parse_compact_lines(body, limit=3))
 
     verification: List[str] = []
-    for heading in ("## 13. Test Strategy", "## 6. Regression Strategy", "## 5. Regression Testing", "## 4. Regression Test Target"):
+    for heading in (
+        "## 13. Test Strategy",
+        "## 6. Regression Strategy",
+        "## 5. Regression Testing",
+        "## 4. Regression Test Target",
+        "## 7. Regression and Verification",
+    ):
         body = sections.get(heading)
         if body:
             verification.extend(_parse_compact_lines(body, limit=4))
@@ -705,6 +752,8 @@ def _generate_execution_brief(workspace: Path, config: Dict[str, Any], policy: D
     brief_text = _format_execution_brief(
         feature=feature,
         work_class=work_class,
+        traceability_mode=traceability_mode,
+        traceability_ref=traceability_ref,
         domain=domain,
         knowledge_mode=knowledge_mode,
         generated_from=generated_from,

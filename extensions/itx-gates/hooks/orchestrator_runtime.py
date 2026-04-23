@@ -22,6 +22,7 @@ from orchestrator_common import (
     _parse_retry_limit,
     _retry_key,
     _task_files_for_review_scope,
+    _e2e_required_for_workspace,
     _tasks_required_for_workspace,
     _validate_plan_content,
     _validate_tasks_checkbox_format,
@@ -55,7 +56,8 @@ def run_generic_checks(
                     "message": (
                         "No supported plan artifact found after plan generation stage. "
                         "Expected one of: system-design-plan*.md, patch-plan*.md, refactor-plan*.md, "
-                        "bugfix-report*.md, migration-plan*.md, tooling-plan*.md, spike-note*.md."
+                        "bugfix-report*.md, migration-plan*.md, tooling-plan*.md, spike-note*.md, "
+                        "modify-plan*.md, hotfix-report*.md, deprecate-plan*.md."
                     ),
                 }
             )
@@ -78,7 +80,8 @@ def run_generic_checks(
             findings.extend(_validate_tasks_checkbox_format(task_files))
 
     if event == "after_implement":
-        findings.extend(check_e2e_test_presence(workspace))
+        if _e2e_required_for_workspace(workspace, policy):
+            findings.extend(check_e2e_test_presence(workspace))
 
     if event == "after_review":
         task_files = _task_files_for_review_scope(workspace, _find_task_files(workspace))
@@ -107,7 +110,8 @@ def run_generic_checks(
                     }
                 )
 
-        findings.extend(check_e2e_test_presence(workspace))
+        if _e2e_required_for_workspace(workspace, policy):
+            findings.extend(check_e2e_test_presence(workspace))
 
     if config.get("execution_mode") == "docker-fallback":
         container_name = (config.get("docker") or {}).get("container_name")
