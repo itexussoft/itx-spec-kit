@@ -35,6 +35,10 @@ class ItxInitTests(unittest.TestCase):
         url = itx_specify.extension_archive_url("owner/repo", "v1.2.3")
         self.assertEqual(url, "https://github.com/owner/repo/archive/v1.2.3.zip")
 
+    def test_local_kit_extensions_include_brownfield_package(self):
+        self.assertIn("itx-gates", itx_specify.LOCAL_KIT_EXTENSIONS)
+        self.assertIn("itx-brownfield-workflows", itx_specify.LOCAL_KIT_EXTENSIONS)
+
     def test_strip_legacy_extension_command_aliases_removes_aliases(self):
         with tempfile.TemporaryDirectory() as tmp:
             ext_dir = Path(tmp) / "ext"
@@ -80,6 +84,84 @@ class ItxInitTests(unittest.TestCase):
             )
             self.assertEqual(run_checked.call_args_list[1].args[0], ["git", "checkout", "v1.2.3"])
             run_specify.assert_called_once()
+
+    def test_install_community_extensions_installs_local_kit_extensions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workspace = root / "ws"
+            kit_root = root / "kit"
+            workspace.mkdir()
+            for ext_name in itx_specify.LOCAL_KIT_EXTENSIONS:
+                (kit_root / "extensions" / ext_name).mkdir(parents=True, exist_ok=True)
+
+            with (
+                mock.patch("itx_specify.run_specify") as run_specify,
+                mock.patch("itx_specify.install_extension_from_git"),
+            ):
+                itx_specify.install_community_extensions(
+                    spec_cli="specify",
+                    kit_root=kit_root,
+                    workspace=workspace,
+                    spec_kit_ref=itx_specify.DEFAULT_SPEC_KIT_REF,
+                    quiet=True,
+                    with_jira=False,
+                )
+
+            local_calls = [
+                call
+                for call in run_specify.call_args_list
+                if call.args[1][:2] == ["extension", "add"] and "--dev" in call.args[1]
+            ]
+            self.assertGreaterEqual(len(local_calls), len(itx_specify.LOCAL_KIT_EXTENSIONS))
+            dev_paths = {call.args[1][2] for call in local_calls}
+            self.assertIn(str(kit_root / "extensions" / "itx-gates"), dev_paths)
+            self.assertIn(str(kit_root / "extensions" / "itx-brownfield-workflows"), dev_paths)
+
+    def test_main_spec_kit_branch_installs_local_kit_extensions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Path(tmp) / "ws"
+            args = argparse.Namespace(
+                project_name="demo",
+                agent="codex",
+                domain="base",
+                knowledge_mode="lazy",
+                workspace=str(workspace),
+                execution_mode="mcp",
+                container_name="",
+                spec_kit_ref=itx_init.DEFAULT_SPEC_KIT_REF,
+                with_jira=False,
+                generic_commands_dir="",
+                debug=False,
+                quiet=True,
+            )
+
+            with (
+                mock.patch("itx_init.parse_args", return_value=args),
+                mock.patch("itx_init.ensure_valid_args"),
+                mock.patch("itx_init.detect_spec_cli", return_value="spec-kit"),
+                mock.patch("itx_init.require_command"),
+                mock.patch("itx_init.run_checked") as run_checked,
+                mock.patch("itx_init.write_itx_config"),
+                mock.patch("itx_init.stage_docs_and_policy"),
+                mock.patch("itx_init.stage_templates"),
+                mock.patch("itx_init.stage_cursor_rules"),
+                mock.patch("itx_init.stage_knowledge"),
+                mock.patch("itx_init.merge_pattern_index"),
+                mock.patch("itx_init.build_knowledge_manifest_file"),
+            ):
+                result = itx_init.main([])
+
+            self.assertEqual(result, 0)
+            ext_installs = [
+                call.args[0]
+                for call in run_checked.call_args_list
+                if call.args
+                and len(call.args[0]) >= 4
+                and call.args[0][:3] == ["spec-kit", "extension", "install"]
+            ]
+            installed_ext_names = {cmd[3] for cmd in ext_installs}
+            self.assertIn("itx-gates", installed_ext_names)
+            self.assertIn("itx-brownfield-workflows", installed_ext_names)
 
     def test_write_itx_config_mcp(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -237,6 +237,12 @@ EXTENSION_REFS: dict[str, str] = {
     "mbachorik/spec-kit-jira": "v0.2.0",
 }
 
+# Local itexus extensions installed from the checked-out kit source.
+LOCAL_KIT_EXTENSIONS: tuple[str, ...] = (
+    "itx-gates",
+    "itx-brownfield-workflows",
+)
+
 
 def extension_repo_url(extension_id: str) -> str:
     return f"https://github.com/{extension_id}.git"
@@ -343,24 +349,26 @@ def install_community_extensions(
     with_jira: bool = False,
     log_fn: Callable[[str], None] | None = None,
 ) -> None:
-    """Run `specify extension add` for itx-gates and pinned community extensions (specify/uvx only)."""
+    """Run `specify extension add` for local kit extensions and pinned community extensions."""
     if spec_cli not in ("specify", "uvx"):
         raise RuntimeError("install_community_extensions requires specify or uvx")
 
-    try:
-        run_specify(
-            spec_cli,
-            ["extension", "add", str(kit_root / "extensions" / "itx-gates"), "--dev"],
-            spec_kit_ref,
-            quiet=quiet,
-            cwd=workspace,
-        )
-    except subprocess.CalledProcessError:
-        _extension_install_warn(
-            quiet,
-            log_fn,
-            "extension add itx-gates failed or redundant; continuing",
-        )
+    for ext_name in LOCAL_KIT_EXTENSIONS:
+        ext_path = kit_root / "extensions" / ext_name
+        try:
+            run_specify(
+                spec_cli,
+                ["extension", "add", str(ext_path), "--dev"],
+                spec_kit_ref,
+                quiet=quiet,
+                cwd=workspace,
+            )
+        except subprocess.CalledProcessError:
+            _extension_install_warn(
+                quiet,
+                log_fn,
+                f"extension add {ext_name} failed or redundant; continuing",
+            )
 
     with tempfile.TemporaryDirectory() as temp_ext_dir:
         temp_root = Path(temp_ext_dir)

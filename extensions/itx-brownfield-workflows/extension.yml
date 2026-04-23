@@ -1,0 +1,41 @@
+schema_version: "1.0"
+
+extension:
+  id: "itx-brownfield-workflows"
+  name: "itexus-spec-kit brownfield workflows"
+  version: 0.2.2
+  description: "Brownfield workflow entry commands packaged as an itx-spec-kit extension"
+  author: "itexus"
+  repository: "https://github.com/sprivalov/itexus-spec-kit"
+  license: "MIT"
+  homepage: "https://github.com/sprivalov/itexus-spec-kit"
+
+requires:
+  speckit_version: ">=0.5.0"
+
+provides:
+  commands:
+    - name: "speckit.bugfix"
+      file: "commands/bugfix.md"
+      description: "Brownfield bugfix entry command (extension-provided)"
+
+    - name: "speckit.refactor"
+      file: "commands/refactor.md"
+      description: "Brownfield refactor entry command (extension-provided)"
+
+    - name: "speckit.modify"
+      file: "commands/modify.md"
+      description: "Brownfield modify entry command (extension-provided)"
+
+    - name: "speckit.hotfix"
+      file: "commands/hotfix.md"
+      description: "Brownfield hotfix entry command (extension-provided)"
+
+    - name: "speckit.deprecate"
+      file: "commands/deprecate.md"
+      description: "Brownfield deprecate entry command (extension-provided)"
+
+tags:
+  - "itexus"
+  - "brownfield"
+  - "workflows"

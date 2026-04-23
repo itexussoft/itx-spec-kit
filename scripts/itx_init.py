@@ -19,6 +19,7 @@ from build_knowledge_manifest import build_manifest
 from itx_specify import (
     DEFAULT_SPEC_KIT_REF,
     EXTENSION_REFS,
+    LOCAL_KIT_EXTENSIONS,
     detect_spec_cli,
     install_community_extensions,
     map_agent_for_specify,
@@ -344,19 +345,20 @@ def main(argv: list[str] | None = None) -> int:
                     f"(overlay presets may lack templates). "
                     f"Content will be staged by the file-copy step."
                 )
-        run_checked(
-            [
-                "spec-kit",
-                "extension",
-                "install",
-                "itx-gates",
-                "--source",
-                str(kit_root / "extensions" / "itx-gates"),
-                "--path",
-                str(workspace),
-            ],
-            quiet=args.quiet,
-        )
+        for ext_name in LOCAL_KIT_EXTENSIONS:
+            run_checked(
+                [
+                    "spec-kit",
+                    "extension",
+                    "install",
+                    ext_name,
+                    "--source",
+                    str(kit_root / "extensions" / ext_name),
+                    "--path",
+                    str(workspace),
+                ],
+                quiet=args.quiet,
+            )
         run_checked(
             [
                 "spec-kit",

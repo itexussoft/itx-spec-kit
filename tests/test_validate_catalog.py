@@ -23,6 +23,7 @@ class ValidateCatalogTests(unittest.TestCase):
         (tmp / "presets" / "base" / "templates").mkdir(parents=True, exist_ok=True)
         (tmp / "presets" / "base" / "templates" / "stub.md").write_text("# stub\n", encoding="utf-8")
         (tmp / "extensions" / "itx-gates").mkdir(parents=True, exist_ok=True)
+        (tmp / "extensions" / "itx-brownfield-workflows").mkdir(parents=True, exist_ok=True)
         (tmp / "catalog" / "index.json").write_text(
             json.dumps(
                 {
@@ -30,7 +31,10 @@ class ValidateCatalogTests(unittest.TestCase):
                     "kit": {"name": "itx", "version": "0.1.0"},
                     "artifacts": {
                         "presets": [{"name": "base", "path": "presets/base"}],
-                        "extensions": [{"name": "itx-gates", "path": "extensions/itx-gates"}],
+                        "extensions": [
+                            {"name": "itx-gates", "path": "extensions/itx-gates"},
+                            {"name": "itx-brownfield-workflows", "path": "extensions/itx-brownfield-workflows"},
+                        ],
                     },
                 }
             ),
@@ -51,6 +55,10 @@ class ValidateCatalogTests(unittest.TestCase):
         )
         (tmp / "extensions" / "itx-gates" / "extension.yml").write_text(
             'schema_version: "1.0"\nextension:\n  id: "itx-gates"\n  version: "0.1.0"\n',
+            encoding="utf-8",
+        )
+        (tmp / "extensions" / "itx-brownfield-workflows" / "extension.yml").write_text(
+            'schema_version: "1.0"\nextension:\n  id: "itx-brownfield-workflows"\n  version: "0.1.0"\n',
             encoding="utf-8",
         )
 

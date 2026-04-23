@@ -1,4 +1,5 @@
 import json
+import shutil
 import sys
 import tempfile
 import unittest
@@ -39,6 +40,15 @@ class PatchTests(unittest.TestCase):
             self.assertGreater(total, 0)
             runner = ws / ".specify" / "extensions" / "itx-gates" / "commands" / "run_speckit.py"
             self.assertTrue(runner.exists())
+
+    def test_patch_installs_brownfield_extension_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = self._make_bootstrapped_workspace(tmp)
+            patch_mod.patch_workspace(ROOT, ws)
+            ext_yml = ws / ".specify" / "extensions" / "itx-brownfield-workflows" / "extension.yml"
+            cmd = ws / ".specify" / "extensions" / "itx-brownfield-workflows" / "commands" / "bugfix.md"
+            self.assertTrue(ext_yml.exists())
+            self.assertTrue(cmd.exists())
 
     def test_patch_creates_cursor_rules(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -373,6 +383,56 @@ class PatchTests(unittest.TestCase):
                 "codex",
                 skip_extension_sync=False,
             )
+
+    def test_main_patch_materializes_for_primary_agent_without_retarget(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp) / "ws"
+            ws.mkdir()
+            (ws / ".itx-config.yml").write_text(
+                'domain: "base"\nexecution_mode: "mcp"\nagents:\n  primary: "codex"\n',
+                encoding="utf-8",
+            )
+
+            with mock.patch("patch.patch_workspace", return_value=(2, [])):
+                with mock.patch("patch.materialize_extension_workflows_for_agent", return_value=3) as mat:
+                    with mock.patch("patch.materialize_extension_skills_for_agent", return_value=1) as skills:
+                        result = patch_mod.main(["--workspace", str(ws)])
+
+            self.assertEqual(result, 0)
+            mat.assert_called_once_with(ws.resolve(), "codex")
+            skills.assert_called_once_with(ws.resolve(), "codex")
+
+    def test_main_patch_mirrors_registry_for_primary_agent_without_retarget(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp) / "ws"
+            ws.mkdir()
+            (ws / ".itx-config.yml").write_text(
+                'domain: "base"\nexecution_mode: "mcp"\nagents:\n  primary: "codex"\n',
+                encoding="utf-8",
+            )
+
+            with mock.patch("patch.patch_workspace", return_value=(0, [])):
+                with mock.patch("patch.materialize_extension_workflows_for_agent", return_value=0):
+                    with mock.patch("patch.materialize_extension_skills_for_agent", return_value=0):
+                        with mock.patch("patch.mirror_registry_commands", return_value=True) as mirror:
+                            result = patch_mod.main(["--workspace", str(ws)])
+
+            self.assertEqual(result, 0)
+            mirror.assert_called_once_with(ws.resolve(), "codex")
+
+    def test_materialize_brownfield_extension_workflows(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp) / "w"
+            ws.mkdir()
+            (ws / ".agents" / "workflows").mkdir(parents=True)
+            src = ROOT / "extensions" / "itx-brownfield-workflows"
+            dst = ws / ".specify" / "extensions" / "itx-brownfield-workflows"
+            shutil.copytree(src, dst, dirs_exist_ok=True)
+
+            n = itx_specify.materialize_extension_workflows_for_agent(ws, "codex")
+            self.assertEqual(n, 5)
+            for name in ("bugfix", "refactor", "modify", "hotfix", "deprecate"):
+                self.assertTrue((ws / ".agents" / "workflows" / f"speckit.{name}.md").exists())
 
     def test_materialize_extension_workflows_idempotent(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -50,6 +50,7 @@ Itexus accelerator for spec-driven AI delivery on top of `github/spec-kit`.
   - `presets/saas-platform` — multi-tenant SaaS constitution, constraints, and patterns (data isolation, OIDC/SSO, white-label BFF config); includes a **domain delivery brief** template for the same reason
 - Shared policy manifest: `presets/base/policy.yml` — single source of truth for plan tier rules consumed by the gate orchestrator
 - Active quality-gate extension: `extensions/itx-gates`
+- Brownfield workflow command extension: `extensions/itx-brownfield-workflows` (`/speckit.bugfix`, `/speckit.refactor`, `/speckit.modify`, `/speckit.hotfix`, `/speckit.deprecate`)
 - Community extensions installed by default: `dsrednicki/spec-kit-cleanup`, `ismaelJimenez/spec-kit-review` (optional: `--with-jira` adds `spec-kit-jira`)
 - Harnesses for Docker fallback execution
 - Catalog metadata: `catalog/index.json`
@@ -227,6 +228,8 @@ After implementation, use your review/cleanup extensions as needed. When the rev
 
 Community extensions (`ismaelJimenez/spec-kit-review`, `dsrednicki/spec-kit-cleanup`) are installed during bootstrap using pinned refs and require the Spec-Kit CLI at runtime. The universal runner adapter resolves the CLI automatically (`spec-kit` → `specify` → `uvx`) so these commands work in any environment, including Cursor's agent shell.
 
+Brownfield entry commands (`/speckit.bugfix`, `/speckit.refactor`, `/speckit.modify`, `/speckit.hotfix`, `/speckit.deprecate`) are shipped by the local `itx-brownfield-workflows` extension. Treat them as extension-provided commands, not guaranteed upstream core commands.
+
 The runner adapter is intended for extension commands (`review.run`, `cleanup.run`) only. Core workflow slash commands like `/speckit.plan` should be run directly in the agent chat, not through the adapter.
 
 ```bash
@@ -289,7 +292,7 @@ These modes require **specify** or **uvx** on `PATH` (not `spec-kit`). They run 
 
 - `.specify/constitution.md`, `.specify/memory/constitution.md` (if present), `.specify/pattern-index.md`, `.specify/policy.yml`, governance YAML under `.specify/`, the base `docs/knowledge-base/*.md` files listed in the patch script, **`.specify/extensions/`** (community extensions and `itx-gates`), and by default **`.specify/templates/`**. Use **`--retarget-ai-refresh-templates`** to allow specify to refresh templates instead of restoring them.
 
-After the normal patch pass, it also appends the retargeted integration key to `agents.installed` (if missing), updates `agents.primary`, then **re-runs** the same community `specify extension add` steps as `itx-init` (`itx-gates`, spec-kit-cleanup, spec-kit-review), **materializes** any extension command prompts into that agent's `workflows/` folder when missing, and **mirrors** `.specify/extensions/.registry` command lists onto the retargeted integration key when needed. Use **`--skip-add-ai-extension-sync`** to skip that extension re-sync.
+After the normal patch pass, it also appends the retargeted integration key to `agents.installed` (if missing), updates `agents.primary`, then **re-runs** the same extension add steps as `itx-init` (local kit extensions plus pinned community review/cleanup), **materializes** any extension command prompts into that agent's `workflows/` folder when missing, and **mirrors** `.specify/extensions/.registry` command lists onto the retargeted integration key when needed. Use **`--skip-add-ai-extension-sync`** to skip that extension re-sync.
 
 `generic` is **not** supported for `--retarget-ai` (use a concrete integration key).
 
@@ -297,7 +300,7 @@ After the normal patch pass, it also appends the retargeted integration key to `
 python scripts/patch.py --workspace /path/to/project --retarget-ai claude
 ```
 
-**`--add-ai`** runs `specify init` in a **temporary** directory and copies only that agent’s artifact tree (from `AGENT_CONFIG` when specify-cli is importable, else a built-in map) into the workspace—**best-effort multi-agent**. It appends the integration key to `agents.installed` in `.itx-config.yml`. After the normal patch pass, it **re-runs** the same community `specify extension add` steps as `itx-init` (`itx-gates`, spec-kit-cleanup, spec-kit-review), then **materializes** any extension command prompts into that agent’s `workflows/` folder when missing, and **mirrors** `.specify/extensions/.registry` command lists onto the new integration key when needed (so tools that only read per-agent entries see extension commands). Use **`--skip-add-ai-extension-sync`** to skip extension install, materialization, and registry mirror (offline or scaffold-only). Upstream `.specify/integration.json` still describes a single primary agent; review overlaps (for example `.agents/`, `.github/`) manually.
+**`--add-ai`** runs `specify init` in a **temporary** directory and copies only that agent’s artifact tree (from `AGENT_CONFIG` when specify-cli is importable, else a built-in map) into the workspace—**best-effort multi-agent**. It appends the integration key to `agents.installed` in `.itx-config.yml`. After the normal patch pass, it **re-runs** the same extension add steps as `itx-init` (local kit extensions plus pinned community review/cleanup), then **materializes** any extension command prompts into that agent’s `workflows/` folder when missing, and **mirrors** `.specify/extensions/.registry` command lists onto the new integration key when needed (so tools that only read per-agent entries see extension commands). Use **`--skip-add-ai-extension-sync`** to skip extension install, materialization, and registry mirror (offline or scaffold-only). Upstream `.specify/integration.json` still describes a single primary agent; review overlaps (for example `.agents/`, `.github/`) manually.
 
 ```bash
 python scripts/patch.py --workspace /path/to/project --add-ai kiro-cli

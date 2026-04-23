@@ -31,6 +31,10 @@
       {
         "name": "itx-gates",
         "path": "extensions/itx-gates"
+      },
+      {
+        "name": "itx-brownfield-workflows",
+        "path": "extensions/itx-brownfield-workflows"
       }
     ]
   }

@@ -17,6 +17,11 @@ Delivery stages:
 12. **`after_review` gate** — validates delivery readiness (all tasks completed, no outstanding Tier 2 feedback, E2E checks still present)
 13. Deliver — prepare done report and open PR for human merge decision
 
+Brownfield entry commands (`/speckit.bugfix`, `/speckit.refactor`,
+`/speckit.modify`, `/speckit.hotfix`, `/speckit.deprecate`) are delivered by
+the local `itx-brownfield-workflows` extension. Treat them as
+extension-provided commands, not guaranteed upstream core commands.
+
 If **`/speckit.analyze` is blocked** with "tasks.md not found", run **`/speckit.tasks`** again (and ensure spec + plan exist for that feature).
 
 ## Progressive loading rule

@@ -46,6 +46,7 @@ from typing import List, Tuple
 import yaml
 
 from itx_specify import (
+    LOCAL_KIT_EXTENSIONS,
     agent_artifact_folder,
     detect_specify_cli,
     install_community_extensions,
@@ -236,6 +237,21 @@ def append_agents_installed(workspace: Path, canonical: str) -> None:
         inst.append(canonical)
     agents["installed"] = inst
     _write_config_dict(cfg_path, data)
+
+
+def primary_agent_from_config(workspace: Path) -> str | None:
+    cfg_path = workspace / ".itx-config.yml"
+    data = _load_config_dict(cfg_path)
+    agents = data.get("agents")
+    if not isinstance(agents, dict):
+        return None
+    raw = agents.get("primary")
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    try:
+        return map_agent_for_specify(raw.strip())
+    except ValueError:
+        return None
 
 
 def copy_agent_tree_from_staging(
@@ -434,15 +450,13 @@ def patch_workspace(kit_root: Path, workspace: Path, force: bool = False) -> Tup
 
     # ---- Kit-owned files: safe to overwrite always ----
 
-    ext_src = kit_root / "extensions" / "itx-gates"
-    ext_dst = workspace / ".specify" / "extensions" / "itx-gates"
-    if ext_dst.exists():
+    for ext_name in LOCAL_KIT_EXTENSIONS:
+        ext_src = kit_root / "extensions" / ext_name
+        ext_dst = workspace / ".specify" / "extensions" / ext_name
         n = copy_tree(ext_src, ext_dst)
         if n:
-            log(f"Updated itx-gates extension ({n} file(s))")
+            log(f"Updated {ext_name} extension ({n} file(s))")
         total += n
-    else:
-        warn(".specify/extensions/itx-gates/ not found — skipping extension update")
 
     rules_src = kit_root / "presets" / "base" / "cursor-rules"
     rules_dst = workspace / ".cursor" / "rules"
@@ -686,6 +700,19 @@ def main(argv: list[str] | None = None) -> int:
             sync_agent,
             skip_extension_sync=args.skip_add_ai_extension_sync,
         )
+    else:
+        primary_agent = primary_agent_from_config(workspace)
+        if primary_agent:
+            n = materialize_extension_workflows_for_agent(workspace, primary_agent)
+            if n:
+                log(f"Materialized {n} extension workflow file(s) for {primary_agent!r}")
+                total += n
+            n = materialize_extension_skills_for_agent(workspace, primary_agent)
+            if n:
+                log(f"Materialized {n} extension skill file(s) for {primary_agent!r}")
+                total += n
+            if mirror_registry_commands(workspace, primary_agent):
+                log(f"Mirrored extension registry command entries for {primary_agent!r}")
 
     if args.fix_tasks:
         fixed = fix_tasks_checkboxes(workspace)
