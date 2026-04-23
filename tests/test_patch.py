@@ -207,6 +207,14 @@ class PatchTests(unittest.TestCase):
             self.assertTrue(deprecate_tpl.exists())
             self.assertIn("- [ ]", tasks_tpl.read_text(encoding="utf-8"))
 
+    def test_patch_updates_migration_guide_in_knowledge_base(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = self._make_bootstrapped_workspace(tmp)
+            patch_mod.patch_workspace(ROOT, ws)
+            migration_doc = ws / "docs" / "knowledge-base" / "migration-guide.md"
+            self.assertTrue(migration_doc.exists())
+            self.assertIn("Migration Guide", migration_doc.read_text(encoding="utf-8"))
+
     # ---- fix_tasks_checkboxes ----
 
     def test_fix_tasks_converts_bare_list_items(self):

@@ -36,6 +36,16 @@ provides:
       description: "Lightweight plan template for scoped patch-level changes"
 
     - type: "template"
+      name: "refactor-plan"
+      file: "templates/refactor-plan-template.md"
+      description: "Refactor-focused plan template for behavior-preserving structural changes"
+
+    - type: "template"
+      name: "bugfix-report"
+      file: "templates/bugfix-report-template.md"
+      description: "Bugfix-focused report template for reproduction, root cause, and fix strategy"
+
+    - type: "template"
       name: "migration-plan"
       file: "templates/migration-plan-template.md"
       description: "Migration-focused plan template for phased technical transitions"
@@ -59,6 +69,11 @@ provides:
       name: "deprecate-plan"
       file: "templates/deprecate-plan-template.md"
       description: "Deprecation plan template with dependency-impact and phased rollout tracking"
+
+    - type: "template"
+      name: "execution-brief"
+      file: "templates/execution-brief-template.md"
+      description: "Compact execution brief template refreshed by gate flows for agent-facing context"
 
     - type: "template"
       name: "test-strategy"

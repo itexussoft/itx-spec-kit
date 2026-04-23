@@ -58,6 +58,9 @@ class BrownfieldExtensionCommandTests(unittest.TestCase):
         self.assertIn("brownfield intake commands", readme)
         self.assertIn("workstream metadata", readme)
         self.assertIn("/speckit.plan", readme)
+        self.assertIn("not guaranteed upstream core commands", readme)
+        self.assertNotIn("/speckit.review_run", readme)
+        self.assertNotIn("/speckit.cleanup_run", readme)
 
 
 if __name__ == "__main__":

@@ -51,6 +51,7 @@ class ItxGatesCommandDocsTests(unittest.TestCase):
                 self.assertIn("Exit `1`", body)
                 self.assertIn(".specify/context/gate_feedback.md", body)
                 self.assertIn(".specify/context/gate-state.yml", body)
+                self.assertIn(".specify/context/gate-events.jsonl", body)
                 self.assertIn(".specify/context/last-gate-summary.md", body)
 
     def test_cursor_rule_requires_manual_gate_invocation_when_hooks_are_not_auto_fired(self):

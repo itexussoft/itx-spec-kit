@@ -5,6 +5,7 @@ Use this index for progressive loading during implementation.
 Start from `.specify/context/execution-brief.md` when available. It is the compact agent-facing summary for objective, scope, active risks, verification targets, and next actions.
 
 - `workflow-and-gates.md`: Tiered gate behavior and delivery flow
+- `migration-guide.md`: Incremental adoption path and legacy-to-current mapping for existing users
 - `domain-selection.md`: How domain overlays influence constraints
 - `delivery-mechanics.md`: Branching, commits, PR policy, and review feedback loop
 
@@ -48,6 +49,8 @@ Domain-specific patterns are layered on top during initialization based on the s
 - `architecture-decision-record-template.md`: Standard ADR format
 - `system-design-plan-template.md`: Mandatory template for the `/speckit.plan` phase
 - `patch-plan-template.md`: Lightweight plan template for scoped patch-level changes
+- `refactor-plan-template.md`: Refactor-focused plan template for behavior-preserving structural changes
+- `bugfix-report-template.md`: Bugfix-focused report template for defect reproduction, root cause, and fix strategy
 - `migration-plan-template.md`: Migration-focused plan template for phased transitions
 - `spike-note-template.md`: Exploratory note template for short investigation spikes
 - `modify-plan-template.md`: Behavior-change plan template for scoped modifications

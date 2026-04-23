@@ -23,7 +23,7 @@ python {SCRIPT}
 
 The wrapper is host-aware:
 
-- if the gate state is stale or missing, it runs the orchestrator
+- if the gate state is stale or missing, it runs `orchestrator.py`
 - if the gate is already fresh, it skips rerunning and preserves the last result
 
 ## How to interpret the result
@@ -38,6 +38,7 @@ The wrapper is host-aware:
 - `.specify/context/gate_feedback.md` when findings exist
 - `.specify/context/execution-brief.md` refreshed after the gate run
 - `.specify/context/gate-state.yml` with the latest machine-readable gate state
+- `.specify/context/gate-events.jsonl` with append-only gate execution events
 - `.specify/context/last-gate-summary.md` with the latest human-readable summary
 
 See `docs/knowledge-base/workflow-and-gates.md` for the full gate reference.

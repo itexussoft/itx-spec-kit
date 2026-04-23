@@ -48,7 +48,7 @@ Itexus accelerator for spec-driven AI delivery on top of `github/spec-kit`.
   - `presets/fintech-banking` — banking-specific constitution, constraints, and patterns (event-sourced ledger, sagas, PSD2 gateway); includes a **domain delivery brief** template for the same reason
   - `presets/healthcare` — healthcare-specific constitution, constraints, and patterns (FHIR facade, zero-trust PHI); includes a **domain delivery brief** template for the same reason
   - `presets/saas-platform` — multi-tenant SaaS constitution, constraints, and patterns (data isolation, OIDC/SSO, white-label BFF config); includes a **domain delivery brief** template for the same reason
-- Shared policy manifest: `presets/base/policy.yml` — single source of truth for plan tier rules consumed by the gate orchestrator
+- Shared policy manifest: `presets/base/policy.yml` — single source of truth for work-class rules consumed by the gate orchestrator
 - Active quality-gate extension: `extensions/itx-gates`
 - Brownfield workflow command extension: `extensions/itx-brownfield-workflows` (`/speckit.bugfix`, `/speckit.refactor`, `/speckit.modify`, `/speckit.hotfix`, `/speckit.deprecate`)
 - Community extensions installed by default: `dsrednicki/spec-kit-cleanup`, `ismaelJimenez/spec-kit-review` (optional: `--with-jira` adds `spec-kit-jira`)
@@ -63,10 +63,16 @@ itexus-spec-kit/
 │   └── index.json
 ├── docs/
 │   ├── adr/
+│   ├── architecture-maintenance.md
+│   ├── migration-guide.md
 │   └── roadmap.md
 ├── extensions/
+│   ├── itx-brownfield-workflows/
+│   │   ├── commands/
+│   │   └── extension.yml
 │   └── itx-gates/
 │       ├── commands/
+│       ├── extension.yml
 │       └── hooks/
 │           └── validators/
 ├── harnesses/
@@ -255,6 +261,8 @@ python .specify/extensions/itx-gates/commands/run_speckit.py \
 
 Cursor rules in `.cursor/rules/itx-speckit-commands.mdc` teach the AI agent to use the runner adapter automatically when the user invokes `/speckit.review.run` or `/speckit.cleanup.run`.
 
+Legacy pseudo-command docs like `review_run.md` and `cleanup_run.md` are intentionally not part of the command surface.
+
 ## Patching already-bootstrapped projects
 
 To apply updates from a newer version of `itexus-spec-kit` to an existing project without re-running the full bootstrap:
@@ -355,6 +363,8 @@ python extensions/itx-gates/hooks/gatectl.py ensure --event after_implement --wo
 python extensions/itx-gates/hooks/gatectl.py ensure --event after_review --workspace /path/to/project
 python extensions/itx-gates/hooks/gatectl.py ensure --event after_plan --workspace /path/to/project --json
 ```
+
+For migration mapping from legacy feature/patch-only usage to the current workstream and extension model, see `docs/migration-guide.md`.
 
 ## Assurance boundaries and control coverage
 

@@ -232,6 +232,40 @@ class ItxInitTests(unittest.TestCase):
             self.assertTrue((ws / ".specify" / "patterns").exists())
             self.assertTrue((ws / ".gitignore").exists())
 
+    def test_stage_docs_and_policy_includes_migration_guide(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            kit = root / "kit"
+            ws = root / "ws"
+            (kit / "presets" / "base" / "docs").mkdir(parents=True)
+            for filename in (
+                "index.md",
+                "workflow-and-gates.md",
+                "domain-selection.md",
+                "delivery-mechanics.md",
+                "migration-guide.md",
+            ):
+                (kit / "presets" / "base" / "docs" / filename).write_text(
+                    f"# {filename}\n", encoding="utf-8"
+                )
+            (kit / "presets" / "base").mkdir(parents=True, exist_ok=True)
+            for filename in (
+                "policy.yml",
+                "decision-authority.yml",
+                "input-contracts.yml",
+                "notification-events.yml",
+                "workflow-state-schema.yml",
+            ):
+                (kit / "presets" / "base" / filename).write_text("k: v\n", encoding="utf-8")
+            ws.mkdir()
+
+            itx_init.stage_docs_and_policy(kit, ws, domain="base")
+            self.assertTrue((ws / "docs" / "knowledge-base" / "migration-guide.md").exists())
+
+    def test_base_docs_index_references_migration_guide(self):
+        text = (ROOT / "presets" / "base" / "docs" / "index.md").read_text(encoding="utf-8")
+        self.assertIn("migration-guide.md", text)
+
     def test_assemble_pattern_index_base_only(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

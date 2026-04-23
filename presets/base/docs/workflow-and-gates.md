@@ -86,6 +86,22 @@ These commands do not replace `/speckit.plan`. They prepare the active
 workstream and then route into `/speckit.plan`, which creates the correct
 planning artifact for the resolved work class.
 
+### Command ownership and adapters
+
+- Upstream core commands (`/speckit.constitution`, `/speckit.specify`,
+  `/speckit.clarify`, `/speckit.plan`, `/speckit.tasks`, `/speckit.analyze`,
+  `/speckit.implement`) should be run directly in agent chat.
+- Brownfield intake commands (`/speckit.bugfix`, `/speckit.refactor`,
+  `/speckit.modify`, `/speckit.hotfix`, `/speckit.deprecate`) are delivered by
+  `itx-brownfield-workflows` and route into `/speckit.plan`.
+- Community review and cleanup commands should run through
+  `.specify/extensions/itx-gates/commands/run_speckit.py`.
+- Gate lifecycle hooks should run through
+  `.specify/extensions/itx-gates/hooks/gatectl.py ensure`.
+
+Legacy pseudo-command docs (`review_run.md`, `cleanup_run.md`) are not part of
+the current command surface.
+
 If **`/speckit.analyze` is blocked** with "tasks.md not found", run
 **`/speckit.tasks`** again (and ensure the required plan artifacts exist for
 that workstream).

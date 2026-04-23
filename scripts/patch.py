@@ -132,7 +132,7 @@ _GOVERNANCE_FILES = (
     "notification-events.yml",
     "workflow-state-schema.yml",
 )
-_KB_DOC_NAMES = ("workflow-and-gates.md", "index.md", "domain-selection.md", "delivery-mechanics.md")
+_KB_DOC_NAMES = ("workflow-and-gates.md", "index.md", "domain-selection.md", "delivery-mechanics.md", "migration-guide.md")
 
 
 def _retarget_relative_paths(workspace: Path, refresh_templates: bool) -> list[Path]:
@@ -482,7 +482,7 @@ def patch_workspace(kit_root: Path, workspace: Path, force: bool = False) -> Tup
     docs_src = kit_root / "presets" / "base" / "docs"
     docs_dst = workspace / "docs" / "knowledge-base"
     if docs_src.exists() and docs_dst.exists():
-        for name in ("workflow-and-gates.md", "index.md", "domain-selection.md", "delivery-mechanics.md"):
+        for name in ("workflow-and-gates.md", "index.md", "domain-selection.md", "delivery-mechanics.md", "migration-guide.md"):
             editable_files.append((docs_src / name, docs_dst / name))
 
     base_preset = kit_root / "presets" / "base"

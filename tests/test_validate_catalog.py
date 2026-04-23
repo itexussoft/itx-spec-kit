@@ -4,6 +4,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import yaml
+
 ROOT = Path(__file__).resolve().parents[1]
 VALIDATE_SCRIPT = ROOT / "scripts" / "validate_catalog.py"
 
@@ -17,6 +19,14 @@ def load_validate_module():
 
 
 class ValidateCatalogTests(unittest.TestCase):
+    def test_base_preset_declares_wave_e2_template_entries(self):
+        data = yaml.safe_load((ROOT / "presets" / "base" / "preset.yml").read_text(encoding="utf-8"))
+        templates = data.get("provides", {}).get("templates", [])
+        names = {entry.get("name") for entry in templates if isinstance(entry, dict)}
+        self.assertIn("refactor-plan", names)
+        self.assertIn("bugfix-report", names)
+        self.assertIn("execution-brief", names)
+
     def make_workspace(self, tmp: Path) -> None:
         (tmp / "catalog").mkdir(parents=True, exist_ok=True)
         (tmp / "presets" / "base").mkdir(parents=True, exist_ok=True)

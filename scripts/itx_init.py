@@ -161,7 +161,7 @@ def stage_docs_and_policy(kit_root: Path, workspace: Path, domain: str) -> None:
     (workspace / "docs" / "knowledge-base").mkdir(parents=True, exist_ok=True)
 
     base_docs = kit_root / "presets" / "base" / "docs"
-    for filename in ("index.md", "workflow-and-gates.md", "domain-selection.md", "delivery-mechanics.md"):
+    for filename in ("index.md", "workflow-and-gates.md", "domain-selection.md", "delivery-mechanics.md", "migration-guide.md"):
         src = base_docs / filename
         if src.exists():
             shutil.copy2(src, workspace / "docs" / "knowledge-base" / filename)
