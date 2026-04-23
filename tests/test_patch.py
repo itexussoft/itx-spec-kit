@@ -159,6 +159,7 @@ class PatchTests(unittest.TestCase):
             patch_mod.patch_workspace(ROOT, ws)
             text = (ws / ".itx-config.yml").read_text(encoding="utf-8")
             self.assertIn("spec_kit_ref:", text)
+            self.assertIn('hook_mode: "hybrid"', text)
 
     def test_patch_preserves_existing_spec_kit_ref(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -172,6 +173,19 @@ class PatchTests(unittest.TestCase):
             text = cfg.read_text(encoding="utf-8")
             self.assertIn("custom-ref", text)
             self.assertEqual(text.count("spec_kit_ref:"), 1)
+
+    def test_patch_preserves_existing_hook_mode(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = self._make_bootstrapped_workspace(tmp)
+            cfg = ws / ".itx-config.yml"
+            cfg.write_text(
+                cfg.read_text(encoding="utf-8") + 'hook_mode: "manual"\n',
+                encoding="utf-8",
+            )
+            patch_mod.patch_workspace(ROOT, ws)
+            text = cfg.read_text(encoding="utf-8")
+            self.assertIn('hook_mode: "manual"', text)
+            self.assertEqual(text.count("hook_mode:"), 1)
 
     # ---- Templates ----
 

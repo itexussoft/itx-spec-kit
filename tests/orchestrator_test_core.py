@@ -81,6 +81,34 @@ def write_workflow_state_feature(workspace: Path, feature: str) -> None:
     )
 
 
+def write_workflow_state_workstream(
+    workspace: Path,
+    *,
+    workstream_id: str,
+    work_class: str,
+    artifact_root: str,
+    current_phase: str = "tasks",
+    parent_feature: str | None = None,
+    branch: str | None = None,
+) -> None:
+    state_path = workspace / ".specify" / "context" / "workflow-state.yml"
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        f'workstream_id: "{workstream_id}"',
+        f'work_class: "{work_class}"',
+        f'artifact_root: "{artifact_root}"',
+        f'current_phase: "{current_phase}"',
+        "phases:",
+        f"  {current_phase}:",
+        "    status: in_progress",
+    ]
+    if parent_feature:
+        lines.insert(0, f'parent_feature: "{parent_feature}"')
+    if branch:
+        lines.insert(0, f'branch: "{branch}"')
+    state_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def write_e2e_test(workspace: Path, name: str = "e2e_test_orders.py", with_assertion: bool = True) -> Path:
     content = "def test_order_flow():\n    assert True\n" if with_assertion else "def test_order_flow():\n    pass\n"
     target = workspace / name
@@ -441,6 +469,69 @@ class OrchestratorTests(unittest.TestCase):
             result = self.run_gate(ws, "after_tasks")
             self.assertEqual(result.returncode, 0)
             self.assertIn("Gates passed", result.stdout)
+
+    def test_after_tasks_active_workstream_scopes_plan_resolution_by_artifact_root(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+
+            (ws / "specs" / "refactor-auth-cleanup").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "refactor-auth-cleanup" / "refactor-plan.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: refactor",
+                        "---",
+                        "# Refactor plan",
+                        "## 1. Goal",
+                        "Improve auth module structure without changing behavior.",
+                        "## 2. Scope / Non-Scope",
+                        "- In scope: auth service extraction",
+                        "- Out of scope: login behavior changes",
+                        "## 3. Invariants to Preserve",
+                        "- Login responses remain backward compatible",
+                        "## 4. Public Contract Impact",
+                        "None",
+                        "## 5. Behavioral Equivalence Strategy",
+                        "- Compare before/after auth integration results",
+                        "## 6. Regression Strategy",
+                        "- Keep auth integration regression green",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            (ws / "specs" / "feature-required").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-required" / "patch-plan.md").write_text(
+                "\n".join(
+                    [
+                        "# Patch plan",
+                        "## 1. Problem Statement",
+                        "Fix a scoped issue that still requires tasks.",
+                        "## 2. Files / Modules Affected",
+                        "- src/other_module.py",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            write_workflow_state_workstream(
+                ws,
+                workstream_id="refactor-auth-cleanup",
+                work_class="refactor",
+                artifact_root="specs/refactor-auth-cleanup",
+                branch="refactor/auth-cleanup",
+            )
+
+            result = self.run_gate(ws, "after_tasks")
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Gates passed", result.stdout)
+            feedback = ws / ".specify" / "context" / "gate_feedback.md"
+            if feedback.exists():
+                self.assertNotIn("tasks-presence", feedback.read_text(encoding="utf-8"))
 
     def test_after_tasks_root_tasks_file_fallback_passes(self):
         with tempfile.TemporaryDirectory() as tmp:

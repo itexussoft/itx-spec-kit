@@ -18,6 +18,7 @@ def _valid_args(**overrides):
         "domain": "base",
         "knowledge_mode": "lazy",
         "execution_mode": "mcp",
+        "hook_mode": "hybrid",
         "spec_kit_ref": itx_init.DEFAULT_SPEC_KIT_REF,
         "generic_commands_dir": "",
     }
@@ -127,6 +128,7 @@ class ItxInitTests(unittest.TestCase):
                 knowledge_mode="lazy",
                 workspace=str(workspace),
                 execution_mode="mcp",
+                hook_mode="hybrid",
                 container_name="",
                 spec_kit_ref=itx_init.DEFAULT_SPEC_KIT_REF,
                 with_jira=False,
@@ -171,11 +173,13 @@ class ItxInitTests(unittest.TestCase):
                 domain="base",
                 execution_mode="mcp",
                 knowledge_mode="lazy",
+                hook_mode="hybrid",
                 container_name="unused",
             )
             text = (ws / ".itx-config.yml").read_text(encoding="utf-8")
             self.assertIn('domain: "base"', text)
             self.assertIn('execution_mode: "mcp"', text)
+            self.assertIn('hook_mode: "hybrid"', text)
             self.assertNotIn("docker:", text)
 
     def test_write_itx_config_docker(self):
@@ -186,11 +190,13 @@ class ItxInitTests(unittest.TestCase):
                 domain="healthcare",
                 execution_mode="docker-fallback",
                 knowledge_mode="eager",
+                hook_mode="manual",
                 container_name="sandbox",
             )
             text = (ws / ".itx-config.yml").read_text(encoding="utf-8")
             self.assertIn('domain: "healthcare"', text)
             self.assertIn('execution_mode: "docker-fallback"', text)
+            self.assertIn('hook_mode: "manual"', text)
             self.assertIn('container_name: "sandbox"', text)
 
     def test_stage_knowledge_eager(self):
@@ -308,6 +314,10 @@ class ItxInitTests(unittest.TestCase):
             _valid_args(agent="generic", generic_commands_dir=".myagent/commands/")
         )
 
+    def test_ensure_valid_args_rejects_unknown_hook_mode(self):
+        with self.assertRaises(ValueError):
+            itx_init.ensure_valid_args(_valid_args(hook_mode="unsupported"))
+
     def test_write_itx_config_includes_primary_agent(self):
         with tempfile.TemporaryDirectory() as tmp:
             ws = Path(tmp)
@@ -316,12 +326,14 @@ class ItxInitTests(unittest.TestCase):
                 domain="base",
                 execution_mode="mcp",
                 knowledge_mode="lazy",
+                hook_mode="auto",
                 container_name="x",
                 primary_agent="cursor-agent",
             )
             text = (ws / ".itx-config.yml").read_text(encoding="utf-8")
             self.assertIn("agents:", text)
             self.assertIn('primary: "cursor-agent"', text)
+            self.assertIn('hook_mode: "auto"', text)
 
 
 if __name__ == "__main__":

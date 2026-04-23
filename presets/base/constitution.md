@@ -2,7 +2,7 @@
 
 ## Core Delivery Rules
 
-1. Follow the spec-driven workflow: constitution → specify → clarify → plan → **tasks** → analyze (optional) → implement. **`/speckit.analyze` requires `tasks.md`** in the active feature; run **`/speckit.tasks`** first.
+1. Follow the spec-driven workflow: constitution → feature specify or brownfield intake → clarify (feature flow only, optional) → plan → **tasks** → analyze (optional) → implement. **`/speckit.analyze` requires `tasks.md`** in the active workstream; run **`/speckit.tasks`** first.
 1b. During `/speckit.tasks`, use `tasks-template.md` as the format reference. Every task item **must** use markdown checkbox syntax (`- [ ]`). During `/speckit.implement`, flip each checkbox to `- [x]` upon completion — do not remove or rewrite completed items.
 2. Maintain test/cleanup/review discipline at the end of implementation. Run community extensions (`/speckit.review.run`, `/speckit.cleanup.run`) via the universal runner adapter — see `.cursor/rules/itx-speckit-commands.mdc`.
 3. Prefer deterministic, auditable changes over opaque shortcuts.
@@ -74,7 +74,7 @@ For detailed rationale and examples, see `.specify/patterns/foundational-princip
 
 ## Delivery Mechanics
 
-25. Use feature-scoped branches named `feature/<slug>`. Keep each branch aligned with a single approved feature scope.
+25. Use workstream-scoped branches. Preferred prefixes are `feature/<slug>`, `refactor/<slug>`, `bugfix/<slug>`, `hotfix/<slug>`, `deprecate/<slug>`, and `modify/<slug>` (or `modify/<parent-feature>-<slug>` when the behavior change is tightly tied to a delivered feature). Keep each branch aligned with a single approved workstream scope.
 26. Use commit prefixes to communicate intent: `spec:`, `plan:`, `tasks:`, `impl:`, `test:`, `docs:`, `fix:`.
 27. Create pull requests only after required gates pass and include traceability links (spec, plan, tasks, done report) plus test/gate evidence.
 28. PR merges always require explicit human action. Agents must not auto-merge.

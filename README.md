@@ -186,11 +186,15 @@ Align with **`github/spec-kit`** so optional steps are not run in the wrong orde
 | 2 | `/speckit.specify` | |
 | 3 | `/speckit.clarify` | optional |
 | 4 | `/speckit.plan` | |
-| 5 | **`/speckit.tasks`** | **Creates `tasks.md`** under the active feature (e.g. `specs/.../tasks.md`) |
+| 5 | **`/speckit.tasks`** | **Creates `tasks.md`** under the active workstream (e.g. `specs/.../tasks.md`) |
 | 6 | `/speckit.analyze` | optional; **requires `tasks.md`** — run only **after** step 5 |
 | 7 | `/speckit.implement` | |
 
-If **`/speckit.analyze`** reports that **`tasks.md` is missing**, run **`/speckit.tasks`** first and confirm the file exists in that feature folder.
+For brownfield work, run the relevant intake command first (`/speckit.bugfix`,
+`/speckit.refactor`, `/speckit.modify`, `/speckit.hotfix`,
+`/speckit.deprecate`), then continue with `/speckit.plan`.
+
+If **`/speckit.analyze`** reports that **`tasks.md` is missing**, run **`/speckit.tasks`** first and confirm the file exists in the active workstream folder.
 
 After implementation, use your review/cleanup extensions as needed. When the review pass is complete, run the **`after_review`** gate so completion readiness is validated before merge (see [Gate orchestration](#gate-orchestration)).
 
@@ -209,7 +213,7 @@ After implementation, use your review/cleanup extensions as needed. When the rev
   --with-jira
 ```
 
-`--agent` accepts any **specify-cli** integration key pinned for [github/spec-kit `v0.5.0`](https://github.com/github/spec-kit/tree/v0.5.0) (see [`scripts/itx_specify.py`](scripts/itx_specify.py) for the exact set). Convenience aliases match upstream: `cursor` → `cursor-agent`, `kiro` → `kiro-cli`. For **`generic`**, pass **`--generic-commands-dir`** (for example `.myagent/commands/`). Generic bootstrap requires **specify** or **uvx** (not the `spec-kit` binary). On success, `.itx-config.yml` records `agents.primary` as the canonical integration key.
+`--agent` accepts any **specify-cli** integration key pinned for [github/spec-kit `v0.5.0`](https://github.com/github/spec-kit/tree/v0.5.0) (see [`scripts/itx_specify.py`](scripts/itx_specify.py) for the exact set). Convenience aliases match upstream: `cursor` → `cursor-agent`, `kiro` → `kiro-cli`. For **`generic`**, pass **`--generic-commands-dir`** (for example `.myagent/commands/`). Generic bootstrap requires **specify** or **uvx** (not the `spec-kit` binary). On success, `.itx-config.yml` records `agents.primary` as the canonical integration key. The bootstrap also records `hook_mode` (`hybrid` by default) so manual-host wrappers know whether to trust auto hooks or actively ensure them.
 
 ### PowerShell
 
@@ -228,7 +232,14 @@ After implementation, use your review/cleanup extensions as needed. When the rev
 
 Community extensions (`ismaelJimenez/spec-kit-review`, `dsrednicki/spec-kit-cleanup`) are installed during bootstrap using pinned refs and require the Spec-Kit CLI at runtime. The universal runner adapter resolves the CLI automatically (`spec-kit` → `specify` → `uvx`) so these commands work in any environment, including Cursor's agent shell.
 
-Brownfield entry commands (`/speckit.bugfix`, `/speckit.refactor`, `/speckit.modify`, `/speckit.hotfix`, `/speckit.deprecate`) are shipped by the local `itx-brownfield-workflows` extension. Treat them as extension-provided commands, not guaranteed upstream core commands.
+Brownfield entry commands (`/speckit.bugfix`, `/speckit.refactor`, `/speckit.modify`, `/speckit.hotfix`, `/speckit.deprecate`) are shipped by the local `itx-brownfield-workflows` extension. Treat them as extension-provided brownfield intake commands, not guaranteed upstream core commands.
+
+Each brownfield intake command establishes or updates workstream metadata
+(`workstream_id`, `work_class`, `artifact_root`, `branch`, optional
+`parent_feature`) and then hands off to `/speckit.plan`. `/speckit.plan`
+remains responsible for creating the dedicated planning artifact for that slice
+(`bugfix-report.md`, `refactor-plan.md`, `modify-plan.md`, `hotfix-report.md`,
+`deprecate-plan.md`).
 
 The runner adapter is intended for extension commands (`review.run`, `cleanup.run`) only. Core workflow slash commands like `/speckit.plan` should be run directly in the agent chat, not through the adapter.
 
@@ -276,7 +287,7 @@ To force-overwrite user-editable files (creates `.patch-backup` first):
 python scripts/patch.py --workspace /path/to/project --force
 ```
 
-The script also appends `spec_kit_ref` to `.itx-config.yml` if missing.
+The script also appends `spec_kit_ref` and `hook_mode` to `.itx-config.yml` if missing.
 
 To specify a custom kit source:
 
@@ -310,10 +321,12 @@ python scripts/patch.py --workspace /path/to/project --add-ai kilocode --skip-ad
 
 ## Gate orchestration
 
-`extensions/itx-gates/hooks/orchestrator.py` implements:
+`extensions/itx-gates/hooks/orchestrator.py` implements the core validators, while `extensions/itx-gates/hooks/gatectl.py` is the host-friendly wrapper used by the `after_*` commands:
 
 - Tier 1 (auto-correction): writes `.specify/context/gate_feedback.md` and exits `0`
 - Tier 2 (hard halt): writes `.specify/context/gate_feedback.md` and exits `1`
+- machine-readable state: writes `.specify/context/gate-state.yml` and appends `.specify/context/gate-events.jsonl`
+- user-visible summary: refreshes `.specify/context/last-gate-summary.md`
 - `after_plan`: validates mandatory plan sections (Full Plan requires sections `4`, `4b`, `5`, and `13`; Patch Plan and Tool Plan use patch-plan requirements `1` and `2`)
 - `after_plan` / `after_tasks` / `after_review`: refresh `.specify/context/execution-brief.md` (additive, non-blocking)
 - `after_tasks`: requires at least one tasks file in supported locations and emits Tier 1 when a tasks file has bare list items (all task items must use checkbox syntax)
@@ -323,11 +336,24 @@ python scripts/patch.py --workspace /path/to/project --add-ai kilocode --skip-ad
 
 Gate enforcement rules (mandatory sections, placeholder markers, retry limits) are loaded from `.specify/policy.yml`, which is copied from `presets/base/policy.yml` during bootstrap.
 
+Canonical lifecycle:
+
+- Feature flow:
+  `/speckit.specify` -> `/speckit.plan` -> `after_plan` -> `/speckit.tasks` -> `after_tasks` -> `/speckit.implement` -> `after_implement` -> review -> `after_review`
+- Brownfield flow:
+  `/speckit.refactor|bugfix|modify|hotfix|deprecate` -> `/speckit.plan` -> `after_plan` -> `/speckit.tasks` -> `after_tasks` -> `/speckit.implement` -> `after_implement` -> review -> `after_review`
+
+Host caveat:
+
+- In environments that truly honor Spec-Kit extension hooks, `after_*` gates may fire automatically.
+- In plain AI shells or UI wrappers where hook execution is not guaranteed, the agent must run `gatectl.py ensure` manually after each phase boundary. `gatectl` reruns the orchestrator only when state is stale or missing and otherwise preserves the last fresh result.
+
 Invocation examples:
 
 ```bash
-python extensions/itx-gates/hooks/orchestrator.py --event=after_implement --workspace=/path/to/project
-python extensions/itx-gates/hooks/orchestrator.py --event=after_review --workspace=/path/to/project
+python extensions/itx-gates/hooks/gatectl.py ensure --event after_implement --workspace /path/to/project
+python extensions/itx-gates/hooks/gatectl.py ensure --event after_review --workspace /path/to/project
+python extensions/itx-gates/hooks/gatectl.py ensure --event after_plan --workspace /path/to/project --json
 ```
 
 ## Assurance boundaries and control coverage

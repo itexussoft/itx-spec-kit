@@ -1,8 +1,8 @@
 # Tasks — [Feature / Epic Title]
 
 > **Produced by:** `/speckit.tasks`
-> **Source spec:** `specs/<feature>/spec.md`
-> **Source plan:** `specs/<feature>/system-design-plan.md`, `patch-plan.md`, `refactor-plan.md`, `bugfix-report.md`, `migration-plan.md`, `spike-note.md`, `modify-plan.md`, `hotfix-report.md`, or `deprecate-plan.md`
+> **Source spec (feature flow only):** `specs/<workstream>/spec.md`
+> **Source plan:** `specs/<workstream>/system-design-plan.md`, `patch-plan.md`, `refactor-plan.md`, `bugfix-report.md`, `migration-plan.md`, `spike-note.md`, `modify-plan.md`, `hotfix-report.md`, or `deprecate-plan.md`
 > **Date:** YYYY-MM-DD
 
 ---

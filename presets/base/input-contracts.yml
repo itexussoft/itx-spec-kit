@@ -18,19 +18,23 @@ phases:
     optional_inputs:
       - stakeholder_answers
     validation:
-      - "spec_document exists at .specify/specs/<feature>/spec.md"
+      - "spec_document exists at specs/<feature>/spec.md"
       - "all required sections in spec are present"
 
   plan:
     required_inputs:
-      - spec_document
+      - planning_context
       - selected_plan_template
       - constitution_rules
       - pattern_index
     optional_inputs:
+      - spec_document
+      - workflow_state
       - clarification_log
       - risk_history
     validation:
+      - "for feature work, spec_document exists at specs/<feature>/spec.md"
+      - "for brownfield work, workflow-state identifies work_class and artifact_root before planning begins"
       - "selected_plan_template in [system-design-plan-template.md, patch-plan-template.md, refactor-plan-template.md, bugfix-report-template.md, migration-plan-template.md, spike-note-template.md, modify-plan-template.md, hotfix-report-template.md, deprecate-plan-template.md]"
       - "plan includes required sections for chosen tier"
       - "when work class requires traceability, plan frontmatter includes traceability_mode plus matching id"
@@ -55,7 +59,7 @@ phases:
       - mocks
     validation:
       - "at least one unchecked task exists before implementation start only when task_policy: required or tasks.md is present"
-      - "working tree clean or changes attributable to current feature branch"
+      - "working tree clean or changes attributable to current workstream branch"
 
   review:
     required_inputs:

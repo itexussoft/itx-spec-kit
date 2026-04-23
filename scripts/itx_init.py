@@ -32,6 +32,7 @@ from itx_specify import (
 ALLOWED_DOMAINS = {"base", "fintech-trading", "fintech-banking", "healthcare", "saas-platform"}
 ALLOWED_KNOWLEDGE_MODES = {"lazy", "eager"}
 ALLOWED_EXECUTION_MODES = {"mcp", "docker-fallback"}
+ALLOWED_HOOK_MODES = {"auto", "manual", "hybrid"}
 
 
 def log(message: str) -> None:
@@ -51,6 +52,8 @@ def ensure_valid_args(args: argparse.Namespace) -> None:
         raise ValueError(f"Invalid --knowledge-mode: {args.knowledge_mode}")
     if args.execution_mode not in ALLOWED_EXECUTION_MODES:
         raise ValueError(f"Invalid --execution-mode: {args.execution_mode}")
+    if getattr(args, "hook_mode", "hybrid") not in ALLOWED_HOOK_MODES:
+        raise ValueError(f"Invalid --hook-mode: {args.hook_mode}")
     if not str(args.spec_kit_ref).strip():
         raise ValueError("--spec-kit-ref must not be empty")
 
@@ -77,6 +80,7 @@ def write_itx_config(
     domain: str,
     execution_mode: str,
     knowledge_mode: str,
+    hook_mode: str,
     container_name: str,
     spec_kit_ref: str = DEFAULT_SPEC_KIT_REF,
     primary_agent: str | None = None,
@@ -84,6 +88,7 @@ def write_itx_config(
     lines = [
         f'domain: "{domain}"',
         f'execution_mode: "{execution_mode}"',
+        f'hook_mode: "{hook_mode}"',
         f'spec_kit_ref: "{spec_kit_ref}"',
         "knowledge:",
         f'  mode: "{knowledge_mode}"',
@@ -218,6 +223,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--knowledge-mode", default="lazy")
     parser.add_argument("--workspace", default=str(Path.cwd()))
     parser.add_argument("--execution-mode", default="mcp")
+    parser.add_argument("--hook-mode", default="hybrid")
     parser.add_argument("--container-name", default="")
     parser.add_argument(
         "--spec-kit-ref",
@@ -436,6 +442,7 @@ def main(argv: list[str] | None = None) -> int:
         args.domain,
         args.execution_mode,
         args.knowledge_mode,
+        args.hook_mode,
         container_name,
         args.spec_kit_ref,
         primary_agent=canonical_agent,

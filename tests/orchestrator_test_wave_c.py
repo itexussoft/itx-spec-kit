@@ -60,6 +60,34 @@ def write_workflow_state_feature(workspace: Path, feature: str) -> None:
     )
 
 
+def write_workflow_state_workstream(
+    workspace: Path,
+    *,
+    workstream_id: str,
+    work_class: str,
+    artifact_root: str,
+    current_phase: str = "plan",
+    parent_feature: str | None = None,
+    branch: str | None = None,
+) -> None:
+    state_path = workspace / ".specify" / "context" / "workflow-state.yml"
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        f'workstream_id: "{workstream_id}"',
+        f'work_class: "{work_class}"',
+        f'artifact_root: "{artifact_root}"',
+        f'current_phase: "{current_phase}"',
+        "phases:",
+        f"  {current_phase}:",
+        "    status: in_progress",
+    ]
+    if parent_feature:
+        lines.insert(0, f'parent_feature: "{parent_feature}"')
+    if branch:
+        lines.insert(0, f'branch: "{branch}"')
+    state_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 class OrchestratorWaveCTests(unittest.TestCase):
     def run_gate(self, workspace: Path, event: str) -> subprocess.CompletedProcess:
         return subprocess.run(
@@ -109,6 +137,80 @@ class OrchestratorWaveCTests(unittest.TestCase):
             self.assertIn("## Behavior Overlay", text)
             self.assertIn("## Verification Targets", text)
             self.assertIn("domain-driven-design.md", text)
+
+    def test_after_plan_workstream_state_scopes_execution_brief_to_artifact_root(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "base")
+            write_policy(ws)
+
+            (ws / "specs" / "feature-a").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "feature-a" / "system-design-plan.md").write_text(
+                "\n".join(
+                    [
+                        "# Plan",
+                        "## 1. Problem Statement",
+                        "Net-new feature plan that should be ignored for this brownfield workstream.",
+                        "## 4. Architectural Patterns Applied",
+                        "- DDD",
+                        "## 4b. Code-Level Design Patterns Applied",
+                        "- Handler",
+                        "## 5. DDD Aggregates",
+                        "- FeatureAggregate",
+                        "## 13. Test Strategy",
+                        "- Preserve feature regression",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            (ws / "specs" / "refactor-checkout-boundaries").mkdir(parents=True, exist_ok=True)
+            (ws / "specs" / "refactor-checkout-boundaries" / "refactor-plan.md").write_text(
+                "\n".join(
+                    [
+                        "---",
+                        "work_class: refactor",
+                        "---",
+                        "# Refactor plan",
+                        "## 1. Goal",
+                        "Separate checkout orchestration from payment adapters.",
+                        "## 2. Scope / Non-Scope",
+                        "- In: `src/checkout.py`, `src/adapters/payment.py`",
+                        "- Out: payment behavior changes",
+                        "## 3. Invariants to Preserve",
+                        "- Checkout success/failure responses remain identical",
+                        "## 4. Public Contract Impact",
+                        "None",
+                        "## 5. Behavioral Equivalence Strategy",
+                        "- Compare checkout integration snapshots before/after",
+                        "## 6. Regression Strategy",
+                        "- Keep checkout integration regression green",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            write_workflow_state_workstream(
+                ws,
+                workstream_id="refactor-checkout-boundaries",
+                work_class="refactor",
+                artifact_root="specs/refactor-checkout-boundaries",
+                parent_feature="feature-a",
+                branch="refactor/checkout-boundaries",
+            )
+
+            result = self.run_gate(ws, "after_plan")
+            self.assertEqual(result.returncode, 0)
+            brief = ws / ".specify" / "context" / "execution-brief.md"
+            self.assertTrue(brief.exists())
+            text = brief.read_text(encoding="utf-8")
+            self.assertIn('feature: "feature-a"', text)
+            self.assertIn('workstream_id: "refactor-checkout-boundaries"', text)
+            self.assertIn('artifact_root: "specs/refactor-checkout-boundaries"', text)
+            self.assertIn("Separate checkout orchestration from payment adapters.", text)
+            self.assertNotIn("Net-new feature plan that should be ignored", text)
 
     def test_after_tasks_execution_brief_includes_unchecked_tasks(self):
         with tempfile.TemporaryDirectory() as tmp:

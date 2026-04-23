@@ -5,10 +5,12 @@ from __future__ import annotations
 
 import argparse
 import ast
+import hashlib
 import json
 import re
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Mapping, Sequence, cast
 
@@ -20,6 +22,7 @@ from validators import Finding, should_skip_path
 TIER_1: Literal["tier1"] = "tier1"
 TIER_2: Literal["tier2"] = "tier2"
 RETRY_STATE_PREFIX = "- Retry-State: `"
+HOOK_MODES = {"auto", "manual", "hybrid"}
 
 
 DOMAIN_VALIDATORS: Dict[str, str] = {
@@ -327,6 +330,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Itexus spec-kit gate orchestrator")
     parser.add_argument("--event", required=True, help="Lifecycle event (e.g. after_implement)")
     parser.add_argument("--workspace", required=True, help="Target workspace root")
+    parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON result")
     return parser.parse_args()
 
 
@@ -335,7 +339,12 @@ def load_config(workspace: Path) -> Dict:
     if not config_path.exists():
         raise FileNotFoundError(f"Missing config: {config_path}")
     text = config_path.read_text(encoding="utf-8")
-    return yaml.safe_load(text) or {}
+    config = yaml.safe_load(text) or {}
+    if not isinstance(config, dict):
+        return {}
+    if not isinstance(config.get("hook_mode"), str) or config.get("hook_mode", "").strip() not in HOOK_MODES:
+        config["hook_mode"] = "hybrid"
+    return config
 
 
 def load_policy(workspace: Path) -> Dict[str, Any]:
@@ -392,10 +401,251 @@ def load_knowledge_manifest(workspace: Path) -> Dict[str, Any]:
         return {}
 
 
+def ensure_context_dir(workspace: Path) -> Path:
+    context_dir = workspace / ".specify" / "context"
+    context_dir.mkdir(parents=True, exist_ok=True)
+    return context_dir
+
+
 def ensure_feedback_path(workspace: Path) -> Path:
-    feedback_path = workspace / ".specify" / "context" / "gate_feedback.md"
-    feedback_path.parent.mkdir(parents=True, exist_ok=True)
-    return feedback_path
+    return ensure_context_dir(workspace) / "gate_feedback.md"
+
+
+def execution_brief_path(workspace: Path) -> Path:
+    return ensure_context_dir(workspace) / "execution-brief.md"
+
+
+def audit_log_path(workspace: Path) -> Path:
+    return ensure_context_dir(workspace) / "audit-log.md"
+
+
+def gate_state_path(workspace: Path) -> Path:
+    return ensure_context_dir(workspace) / "gate-state.yml"
+
+
+def gate_events_path(workspace: Path) -> Path:
+    return ensure_context_dir(workspace) / "gate-events.jsonl"
+
+
+def last_gate_summary_path(workspace: Path) -> Path:
+    return ensure_context_dir(workspace) / "last-gate-summary.md"
+
+
+def _artifact_record(workspace: Path, path: Path) -> Dict[str, Any] | None:
+    try:
+        resolved = path.resolve()
+        resolved.relative_to(workspace.resolve())
+    except (OSError, ValueError):
+        return None
+    if not resolved.exists() or not resolved.is_file():
+        return None
+    stat = resolved.stat()
+    try:
+        sha256 = hashlib.sha256(resolved.read_bytes()).hexdigest()
+    except OSError:
+        return None
+    return {
+        "path": str(resolved.relative_to(workspace)),
+        "size": stat.st_size,
+        "mtime_ns": stat.st_mtime_ns,
+        "sha256": sha256,
+    }
+
+
+def _dedupe_paths(paths: Sequence[Path]) -> List[Path]:
+    deduped: List[Path] = []
+    seen: set[Path] = set()
+    for path in paths:
+        try:
+            resolved = path.resolve()
+        except OSError:
+            continue
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        deduped.append(resolved)
+    return deduped
+
+
+def collect_artifact_records(workspace: Path, paths: Sequence[Path]) -> List[Dict[str, Any]]:
+    records: List[Dict[str, Any]] = []
+    for path in _dedupe_paths(paths):
+        record = _artifact_record(workspace, path)
+        if record is not None:
+            records.append(record)
+    records.sort(key=lambda item: str(item.get("path", "")))
+    return records
+
+
+def load_gate_state(workspace: Path) -> Dict[str, Any] | None:
+    state_path = gate_state_path(workspace)
+    if not state_path.exists():
+        return None
+    try:
+        data = yaml.safe_load(state_path.read_text(encoding="utf-8"))
+    except (yaml.YAMLError, OSError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    return data
+
+
+def _gate_generic_input_files(workspace: Path) -> List[Path]:
+    files = [
+        workspace / ".itx-config.yml",
+        workspace / ".specify" / "policy.yml",
+        workspace / ".specify" / "context" / "workflow-state.yml",
+    ]
+    return [path for path in files if path.exists()]
+
+
+def resolve_gate_input_files(workspace: Path, event: str, policy: Dict[str, Any]) -> List[Path]:
+    paths: List[Path] = list(_gate_generic_input_files(workspace))
+    if event == "after_plan":
+        paths.extend(_plan_files_for_task_policy_resolution(workspace))
+    elif event == "after_tasks":
+        paths.extend(_plan_files_for_task_policy_resolution(workspace))
+        paths.extend(_task_files_for_review_scope(workspace, _find_task_files(workspace)))
+    elif event == "after_implement":
+        paths.extend(_task_files_for_review_scope(workspace, _find_task_files(workspace)))
+        paths.extend(_find_e2e_test_files(workspace))
+    elif event == "after_review":
+        paths.extend(_task_files_for_review_scope(workspace, _find_task_files(workspace)))
+        feedback = ensure_feedback_path(workspace)
+        if feedback.exists():
+            paths.append(feedback)
+    return _dedupe_paths(paths)
+
+
+def resolve_gate_output_files(workspace: Path, event: str) -> List[Path]:
+    paths = [last_gate_summary_path(workspace)]
+    feedback = ensure_feedback_path(workspace)
+    if feedback.exists():
+        paths.append(feedback)
+    if event in {"after_plan", "after_tasks", "after_review"}:
+        brief = execution_brief_path(workspace)
+        if brief.exists():
+            paths.append(brief)
+    audit = audit_log_path(workspace)
+    if audit.exists():
+        paths.append(audit)
+    return _dedupe_paths(paths)
+
+
+def build_gate_state_payload(
+    *,
+    workspace: Path,
+    event: str,
+    status: str,
+    exit_code: int,
+    hook_mode: str,
+    started_at: str,
+    completed_at: str,
+    findings: Sequence[Finding],
+    input_files: Sequence[Path],
+    output_files: Sequence[Path],
+) -> Dict[str, Any]:
+    metadata = _load_active_workstream_metadata(workspace)
+    return {
+        "event": event,
+        "status": status,
+        "exit_code": exit_code,
+        "hook_mode": hook_mode,
+        "started_at": started_at,
+        "completed_at": completed_at,
+        "feature": metadata.get("feature"),
+        "workstream_id": metadata.get("workstream_id"),
+        "work_class": metadata.get("work_class"),
+        "artifact_root": metadata.get("artifact_root"),
+        "parent_feature": metadata.get("parent_feature"),
+        "branch": metadata.get("branch"),
+        "tier1_count": sum(1 for finding in findings if finding.get("severity") == TIER_1),
+        "tier2_count": sum(1 for finding in findings if finding.get("severity") == TIER_2),
+        "input_artifacts": collect_artifact_records(workspace, input_files),
+        "output_artifacts": collect_artifact_records(workspace, output_files),
+        "findings": list(findings),
+    }
+
+
+def write_gate_state(workspace: Path, payload: Mapping[str, Any]) -> None:
+    state_path = gate_state_path(workspace)
+    state_path.write_text(yaml.safe_dump(dict(payload), sort_keys=False, allow_unicode=True), encoding="utf-8")
+
+
+def append_gate_event(workspace: Path, payload: Mapping[str, Any]) -> None:
+    events_path = gate_events_path(workspace)
+    with events_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(dict(payload), ensure_ascii=False, sort_keys=False) + "\n")
+
+
+def write_last_gate_summary(
+    workspace: Path,
+    *,
+    event: str,
+    status: str,
+    exit_code: int,
+    hook_mode: str,
+    tier1_count: int,
+    tier2_count: int,
+    workstream_id: str | None,
+    artifact_root: str | None,
+) -> None:
+    summary_path = last_gate_summary_path(workspace)
+    next_action = "Inspect .specify/context/gate_feedback.md before continuing." if tier1_count or tier2_count else "No remediation required."
+    if tier2_count:
+        next_action = "Stop delivery and resolve Tier 2 findings before proceeding."
+    lines = [
+        "# Last Gate Summary",
+        "",
+        f"- Event: `{event}`",
+        f"- Status: `{status}`",
+        f"- Exit Code: `{exit_code}`",
+        f"- Hook Mode: `{hook_mode}`",
+        f"- Tier 1 Findings: `{tier1_count}`",
+        f"- Tier 2 Findings: `{tier2_count}`",
+        f"- Workstream: `{workstream_id or 'workspace'}`",
+        f"- Artifact Root: `{artifact_root or 'workspace'}`",
+        "",
+        "## Next Action",
+        next_action,
+        "",
+    ]
+    summary_path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def evaluate_gate_freshness(
+    workspace: Path,
+    event: str,
+    policy: Dict[str, Any],
+) -> tuple[bool, str]:
+    state = load_gate_state(workspace)
+    if state is None:
+        return False, "missing-state"
+    if str(state.get("event", "")).strip() != event:
+        return False, "event-mismatch"
+
+    current_inputs = collect_artifact_records(workspace, resolve_gate_input_files(workspace, event, policy))
+    recorded_inputs = state.get("input_artifacts")
+    if not isinstance(recorded_inputs, list):
+        return False, "missing-input-snapshot"
+    if current_inputs != recorded_inputs:
+        return False, "inputs-changed"
+
+    recorded_outputs = state.get("output_artifacts")
+    if isinstance(recorded_outputs, list):
+        for record in recorded_outputs:
+            if not isinstance(record, dict):
+                return False, "invalid-output-snapshot"
+            rel_path = record.get("path")
+            if not isinstance(rel_path, str) or not rel_path.strip():
+                return False, "invalid-output-snapshot"
+            if not (workspace / rel_path).exists():
+                return False, "output-missing"
+
+    summary = last_gate_summary_path(workspace)
+    if not summary.exists():
+        return False, "summary-missing"
+    return True, "fresh"
 
 
 def _retry_key(event: str, finding: Finding) -> str:
@@ -1106,7 +1356,7 @@ def _validate_plan_traceability(
     return findings
 
 
-def _load_active_feature_from_workflow_state(workspace: Path) -> str | None:
+def _load_workflow_state_data(workspace: Path) -> Dict[str, Any] | None:
     state_path = workspace / ".specify" / "context" / "workflow-state.yml"
     if not state_path.exists():
         return None
@@ -1116,11 +1366,69 @@ def _load_active_feature_from_workflow_state(workspace: Path) -> str | None:
         return None
     if not isinstance(data, dict):
         return None
-    feature = data.get("feature")
-    if not isinstance(feature, str):
+    return data
+
+
+def _workflow_state_string(data: Mapping[str, Any], key: str) -> str | None:
+    raw_value = data.get(key)
+    if not isinstance(raw_value, str):
         return None
-    normalized = feature.strip()
+    normalized = raw_value.strip()
     return normalized or None
+
+
+def _normalize_workspace_relative_path(workspace: Path, raw_path: str) -> Path | None:
+    candidate = Path(raw_path.strip())
+    if not raw_path.strip() or candidate.is_absolute():
+        return None
+    workspace_root = workspace.resolve()
+    resolved_candidate = (workspace / candidate).resolve()
+    try:
+        resolved_candidate.relative_to(workspace_root)
+    except ValueError:
+        return None
+    return resolved_candidate
+
+
+def _load_active_workstream_metadata(workspace: Path) -> Dict[str, str]:
+    data = _load_workflow_state_data(workspace)
+    if data is None:
+        return {}
+    metadata: Dict[str, str] = {}
+    for key in ("feature", "workstream_id", "work_class", "artifact_root", "parent_feature", "branch"):
+        value = _workflow_state_string(data, key)
+        if value:
+            metadata[key] = value
+    return metadata
+
+
+def _resolve_active_artifact_root_from_workflow_state(workspace: Path) -> Path | None:
+    metadata = _load_active_workstream_metadata(workspace)
+    raw_artifact_root = metadata.get("artifact_root")
+    if raw_artifact_root:
+        normalized = _normalize_workspace_relative_path(workspace, raw_artifact_root)
+        if normalized is not None:
+            return normalized
+
+    workstream_id = metadata.get("workstream_id")
+    if workstream_id:
+        inferred = _normalize_workspace_relative_path(workspace, f"specs/{workstream_id}")
+        if inferred is not None:
+            return inferred
+
+    feature = metadata.get("feature")
+    if feature:
+        inferred = _normalize_workspace_relative_path(workspace, f"specs/{feature}")
+        if inferred is not None:
+            return inferred
+
+    return None
+
+
+def _load_active_feature_from_workflow_state(workspace: Path) -> str | None:
+    metadata = _load_active_workstream_metadata(workspace)
+    feature = metadata.get("feature") or metadata.get("parent_feature")
+    return feature or None
 
 
 def _plan_files_for_task_policy_resolution(workspace: Path) -> List[Path]:
@@ -1128,15 +1436,14 @@ def _plan_files_for_task_policy_resolution(workspace: Path) -> List[Path]:
     if not all_plan_files:
         return []
 
-    active_feature = _load_active_feature_from_workflow_state(workspace)
-    if not active_feature:
+    active_artifact_root = _resolve_active_artifact_root_from_workflow_state(workspace)
+    if active_artifact_root is None:
         return all_plan_files
 
-    feature_root = workspace / "specs" / active_feature
     scoped: List[Path] = []
     for plan_file in all_plan_files:
         try:
-            plan_file.relative_to(feature_root)
+            plan_file.relative_to(active_artifact_root)
         except ValueError:
             continue
         scoped.append(plan_file)
@@ -1144,11 +1451,10 @@ def _plan_files_for_task_policy_resolution(workspace: Path) -> List[Path]:
 
 
 def _task_files_for_review_scope(workspace: Path, task_files: Sequence[Path]) -> List[Path]:
-    active_feature = _load_active_feature_from_workflow_state(workspace)
-    if not active_feature:
+    active_artifact_root = _resolve_active_artifact_root_from_workflow_state(workspace)
+    if active_artifact_root is None:
         return list(task_files)
 
-    feature_root = workspace / "specs" / active_feature
     scoped: List[Path] = []
     for task_file in task_files:
         try:
@@ -1162,7 +1468,7 @@ def _task_files_for_review_scope(workspace: Path, task_files: Sequence[Path]) ->
             scoped.append(task_file)
             continue
         try:
-            task_file.relative_to(feature_root)
+            task_file.relative_to(active_artifact_root)
         except ValueError:
             continue
         scoped.append(task_file)
@@ -1170,22 +1476,22 @@ def _task_files_for_review_scope(workspace: Path, task_files: Sequence[Path]) ->
 
 
 def _task_files_for_execution_brief_scope(workspace: Path, task_files: Sequence[Path], plan_path: Path) -> List[Path]:
-    active_feature = _load_active_feature_from_workflow_state(workspace)
-    if active_feature:
+    active_artifact_root = _resolve_active_artifact_root_from_workflow_state(workspace)
+    if active_artifact_root is not None:
         return _task_files_for_review_scope(workspace, task_files)
 
     try:
         plan_rel = plan_path.relative_to(workspace)
     except ValueError:
         return []
-    if len(plan_rel.parts) < 3 or plan_rel.parts[0] != "specs":
+    if len(plan_rel.parts) < 2 or plan_rel.parts[0] != "specs":
         return []
 
-    feature_root = workspace / "specs" / plan_rel.parts[1]
+    artifact_root = plan_path.parent
     scoped: List[Path] = []
     for task_file in task_files:
         try:
-            task_file.relative_to(feature_root)
+            task_file.relative_to(artifact_root)
         except ValueError:
             continue
         scoped.append(task_file)

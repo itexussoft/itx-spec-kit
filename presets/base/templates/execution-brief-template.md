@@ -1,6 +1,9 @@
 ---
 schema_version: "1.0"
 feature: "<feature-slug>"
+workstream_id: "<feature-slug|brownfield-workstream-slug>"
+artifact_root: "<specs/...>"
+parent_feature: "<feature-slug|none>"
 work_class: "<feature|patch|refactor|bugfix|migration|tooling|spike|modify|hotfix|deprecate>"
 traceability_mode: "<requirement|invariant|risk|incident|adr|none>"
 traceability_ref: "<requirement_id|invariant_id|risk_id|incident_id|adr_id|n/a>"

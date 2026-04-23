@@ -26,9 +26,10 @@ from orchestrator_common import (
     _extract_markdown_h2_sections,
     _find_plan_files,
     _find_task_files,
-    _load_active_feature_from_workflow_state,
+    _load_active_workstream_metadata,
     _resolve_legacy_work_class,
     _resolve_plan_policy_entry,
+    _resolve_active_artifact_root_from_workflow_state,
     _split_frontmatter,
     _task_files_for_execution_brief_scope,
     _traceability_mode_id_fields,
@@ -66,13 +67,12 @@ def _plan_priority(path: Path) -> int:
 
 
 def _resolve_plan_for_execution_brief(workspace: Path) -> Path | None:
-    active_feature = _load_active_feature_from_workflow_state(workspace)
-    if active_feature:
-        feature_root = workspace / "specs" / active_feature
+    active_artifact_root = _resolve_active_artifact_root_from_workflow_state(workspace)
+    if active_artifact_root is not None:
         scoped: List[Path] = []
         for plan_file in _find_plan_files(workspace):
             try:
-                plan_file.relative_to(feature_root)
+                plan_file.relative_to(active_artifact_root)
             except ValueError:
                 continue
             scoped.append(plan_file)
@@ -85,10 +85,61 @@ def _resolve_plan_for_execution_brief(workspace: Path) -> Path | None:
     return None
 
 
+def _infer_workstream_context_from_plan(workspace: Path, plan_path: Path) -> dict[str, str]:
+    metadata = _load_active_workstream_metadata(workspace)
+    artifact_root_path = _resolve_active_artifact_root_from_workflow_state(workspace)
+    if artifact_root_path is None:
+        try:
+            rel_plan = plan_path.relative_to(workspace)
+        except ValueError:
+            rel_plan = None
+        if rel_plan is not None and len(rel_plan.parts) >= 2 and rel_plan.parts[0] == "specs":
+            artifact_root_path = plan_path.parent
+
+    artifact_root = "workspace"
+    rel_artifact_root: Path | None = None
+    if artifact_root_path is not None:
+        try:
+            rel_artifact_root = artifact_root_path.relative_to(workspace)
+        except ValueError:
+            rel_artifact_root = None
+        if rel_artifact_root is not None:
+            artifact_root = str(rel_artifact_root)
+
+    workstream_id = metadata.get("workstream_id")
+    feature = metadata.get("feature") or metadata.get("parent_feature")
+    parent_feature = metadata.get("parent_feature")
+
+    if rel_artifact_root is not None and rel_artifact_root.parts and rel_artifact_root.parts[0] == "specs":
+        spec_parts = rel_artifact_root.parts[1:]
+        if len(spec_parts) >= 3 and spec_parts[1] == "modifications":
+            parent_feature = parent_feature or spec_parts[0]
+            feature = feature or spec_parts[0]
+            workstream_id = workstream_id or spec_parts[-1]
+        elif spec_parts:
+            workstream_id = workstream_id or spec_parts[-1]
+            feature = feature or spec_parts[0]
+
+    if workstream_id is None:
+        workstream_id = plan_path.stem
+    if feature is None:
+        feature = parent_feature or workstream_id
+    if parent_feature is None:
+        parent_feature = "none"
+
+    return {
+        "feature": feature,
+        "workstream_id": workstream_id,
+        "artifact_root": artifact_root,
+        "parent_feature": parent_feature,
+    }
+
+
 def _infer_feature_from_plan(workspace: Path, plan_path: Path) -> str:
-    active_feature = _load_active_feature_from_workflow_state(workspace)
-    if active_feature:
-        return active_feature
+    context = _infer_workstream_context_from_plan(workspace, plan_path)
+    feature = context.get("feature")
+    if feature:
+        return feature
     try:
         rel = plan_path.relative_to(workspace)
     except ValueError:
@@ -190,6 +241,9 @@ def _task_lines_for_brief(task_files: Sequence[Path]) -> tuple[List[str], List[s
 def _format_execution_brief(
     *,
     feature: str,
+    workstream_id: str,
+    artifact_root: str,
+    parent_feature: str,
     work_class: str,
     traceability_mode: str,
     traceability_ref: str,
@@ -213,6 +267,9 @@ def _format_execution_brief(
         "---",
         'schema_version: "1.0"',
         f'feature: "{feature}"',
+        f'workstream_id: "{workstream_id}"',
+        f'artifact_root: "{artifact_root}"',
+        f'parent_feature: "{parent_feature}"',
         f'work_class: "{work_class}"',
         f'traceability_mode: "{traceability_mode}"',
         f'traceability_ref: "{traceability_ref}"',
@@ -612,7 +669,11 @@ def _generate_execution_brief(workspace: Path, config: Dict[str, Any], policy: D
             raw_ref = frontmatter.get(id_field)
             if isinstance(raw_ref, str) and raw_ref.strip():
                 traceability_ref = raw_ref.strip()
-    feature = _infer_feature_from_plan(workspace, plan_path)
+    workstream_context = _infer_workstream_context_from_plan(workspace, plan_path)
+    feature = workstream_context["feature"]
+    workstream_id = workstream_context["workstream_id"]
+    artifact_root = workstream_context["artifact_root"]
+    parent_feature = workstream_context["parent_feature"]
     domain = str(config.get("domain", "base")).strip() or "base"
     knowledge_mode = str((config.get("knowledge") or {}).get("mode", "eager")).strip().lower() or "eager"
 
@@ -751,6 +812,9 @@ def _generate_execution_brief(workspace: Path, config: Dict[str, Any], policy: D
 
     brief_text = _format_execution_brief(
         feature=feature,
+        workstream_id=workstream_id,
+        artifact_root=artifact_root,
+        parent_feature=parent_feature,
         work_class=work_class,
         traceability_mode=traceability_mode,
         traceability_ref=traceability_ref,
@@ -782,7 +846,7 @@ def _generate_execution_brief(workspace: Path, config: Dict[str, Any], policy: D
     )
     _append_pre_action_audit_log(
         workspace=workspace,
-        feature=feature,
+        feature=workstream_id,
         plan_path=plan_path,
         triggers=triggers,
         file_refs=dedup_files,

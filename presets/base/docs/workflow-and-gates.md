@@ -5,10 +5,15 @@ Delivery stages:
 1. Constitution (`/speckit.constitution`)
 2. Specify (`/speckit.specify`)
 3. Clarify (`/speckit.clarify`, optional)
-4. Plan (`/speckit.plan`) — read `.specify/pattern-index.md`, select relevant pattern files, and produce the work-class artifact required by policy. Supported artifacts include `system-design-plan`, `patch-plan`, `refactor-plan`, `bugfix-report`, `migration-plan`, `spike-note`, `modify-plan`, `hotfix-report`, and `deprecate-plan`. In lazy knowledge mode, read full candidate pattern content from `.specify/.knowledge-store/` during planning.
+4. Select the correct planning entry path for the active work item.
+   - Feature flow: `/speckit.specify` -> `/speckit.plan`
+   - Brownfield flow: `/speckit.bugfix`, `/speckit.refactor`, `/speckit.modify`, `/speckit.hotfix`, or `/speckit.deprecate` -> `/speckit.plan`
+   - Brownfield intake commands establish workstream metadata (`workstream_id`, `work_class`, `artifact_root`, `branch`, optional `parent_feature`) before `/speckit.plan`.
+   - `/speckit.plan` reads `.specify/pattern-index.md`, selects relevant pattern files, and produces the planning artifact mapped to the resolved work class.
+   - In lazy knowledge mode, read full candidate pattern content from `.specify/.knowledge-store/` during planning.
 5. **`after_plan` gate** — validates plan presence + mandatory sections; in lazy knowledge mode, materializes only selected pattern files into `.specify/`
 5b. **Execution brief refresh** — after plan/tasks/review checks, the orchestrator updates `.specify/context/execution-brief.md` as a compact agent-facing summary (additive, non-blocking).
-6. Tasks (`/speckit.tasks`) — produces **`tasks.md`** in the active feature directory using `tasks-template.md` as format reference. Every task **must** use `- [ ]` checkbox syntax.
+6. Tasks (`/speckit.tasks`) — produces **`tasks.md`** in the active workstream directory using `tasks-template.md` as format reference. Every task **must** use `- [ ]` checkbox syntax.
 7. **`after_tasks` gate** — validates tasks file presence and checkbox format
 8. Analyze (`/speckit.analyze`, optional) — **only after** `tasks.md` exists; cross-artifact check needs the task inventory
 9. Implement (`/speckit.implement`)
@@ -17,12 +22,73 @@ Delivery stages:
 12. **`after_review` gate** — validates delivery readiness (all tasks completed, no outstanding Tier 2 feedback, E2E checks still present)
 13. Deliver — prepare done report and open PR for human merge decision
 
+## Canonical lifecycle
+
+### Feature flow
+
+1. `/speckit.constitution` once per project or when project rules truly change
+2. `/speckit.specify`
+3. `/speckit.clarify` when needed
+4. `/speckit.plan`
+5. `after_plan`
+6. `/speckit.tasks`
+7. `after_tasks`
+8. `/speckit.analyze` optional
+9. `/speckit.implement`
+10. `after_implement`
+11. `/speckit.review.run` or equivalent review flow
+12. `after_review`
+13. `/speckit.cleanup.run` when needed
+14. deliver / done report / PR
+
+### Brownfield flow
+
+1. Choose the right intake command:
+   - `/speckit.refactor`
+   - `/speckit.bugfix`
+   - `/speckit.modify`
+   - `/speckit.hotfix`
+   - `/speckit.deprecate`
+2. The intake command establishes or updates:
+   - `workstream_id`
+   - `work_class`
+   - `artifact_root`
+   - `branch`
+   - optional `parent_feature`
+3. `/speckit.plan`
+4. `after_plan`
+5. `/speckit.tasks` when required or useful for that work class
+6. `after_tasks`
+7. `/speckit.analyze` optional
+8. `/speckit.implement`
+9. `after_implement`
+10. `/speckit.review.run` or equivalent review flow
+11. `after_review`
+12. `/speckit.cleanup.run` when needed
+13. deliver / done report / PR
+
+### Host capability rule
+
+If the current host truly supports Spec-Kit extension hooks, the `after_*`
+gates should fire automatically. In plain AI shells or UI wrappers where hook
+execution is not guaranteed, the agent must invoke `gatectl.py ensure`
+manually after each corresponding phase boundary. The wrapper reruns the
+orchestrator only when gate state is stale or missing and otherwise preserves
+the last fresh result.
+
 Brownfield entry commands (`/speckit.bugfix`, `/speckit.refactor`,
 `/speckit.modify`, `/speckit.hotfix`, `/speckit.deprecate`) are delivered by
 the local `itx-brownfield-workflows` extension. Treat them as
-extension-provided commands, not guaranteed upstream core commands.
+extension-provided brownfield intake commands, not guaranteed upstream core
+commands.
 
-If **`/speckit.analyze` is blocked** with "tasks.md not found", run **`/speckit.tasks`** again (and ensure spec + plan exist for that feature).
+These commands do not replace `/speckit.plan`. They prepare the active
+workstream and then route into `/speckit.plan`, which creates the correct
+planning artifact for the resolved work class.
+
+If **`/speckit.analyze` is blocked** with "tasks.md not found", run
+**`/speckit.tasks`** again (and ensure the required plan artifacts exist for
+that workstream).
 
 ## Progressive loading rule
 
@@ -87,6 +153,20 @@ Gate enforcement rules (mandatory sections, placeholder markers, retry limits) a
 
 Execution-brief generation is intentionally additive and does not change gate pass/fail semantics.
 
+## Gate state and host reliability
+
+- `.itx-config.yml` records `hook_mode` (`hybrid` by default).
+- `.specify/context/gate-state.yml` stores the latest machine-readable gate snapshot.
+- `.specify/context/gate-events.jsonl` appends an event log for every gate execution.
+- `.specify/context/last-gate-summary.md` stores the latest human-readable result.
+- In manual or hybrid hosts, prefer:
+
+```bash
+python .specify/extensions/itx-gates/hooks/gatectl.py ensure --event after_plan --workspace .
+```
+
+- Add `--json` when the host or wrapper can consume structured output directly.
+
 ## Testing validation rules
 
 During `after_implement`, the gate enforces baseline E2E testing hygiene for non-advisory work classes:
@@ -103,6 +183,7 @@ During `after_implement`, the gate enforces baseline E2E testing hygiene for non
 
 - **Tier 1:** non-critical issues are written to `.specify/context/gate_feedback.md` and execution continues.
 - **Tier 2:** critical issues are also written to `gate_feedback.md` and execution stops with a non-zero exit code.
+- Every gate execution also refreshes `gate-state.yml` and `last-gate-summary.md`, so hosts that hide shell output still have a durable result surface.
 - Tier 1 retries are tracked per `event + rule` and escalate to Tier 2 when a specific finding exceeds the retry limit (default: 3, configurable via `gate.max_tier1_retries` in `.itx-config.yml`).
 - Findings can include confidence metadata (`deterministic` or `heuristic`) and remediation ownership for triage.
 - By default, heuristic Tier 1 findings do not auto-escalate on retry unless `gate.heuristic_retry_escalates` is enabled.

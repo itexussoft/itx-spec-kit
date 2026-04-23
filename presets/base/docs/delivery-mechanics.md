@@ -2,9 +2,16 @@
 
 ## Branching Strategy
 
-- Create one branch per feature using `feature/<slug>`.
-- Keep branch scope aligned with a single approved spec/plan.
-- Avoid mixing unrelated fixes into the same feature branch.
+- Create one branch per active workstream.
+- Recommended prefixes:
+  - `feature/<slug>` for net-new capability
+  - `refactor/<slug>` for behavior-preserving cleanup
+  - `bugfix/<slug>` for defect correction
+  - `hotfix/<slug>` for urgent incident response
+  - `deprecate/<slug>` for phased sunset/removal work
+  - `modify/<slug>` or `modify/<parent-feature>-<slug>` for behavior changes
+- Keep branch scope aligned with a single approved workstream and plan.
+- Avoid mixing unrelated fixes into the same workstream branch.
 
 ## Commit Conventions
 

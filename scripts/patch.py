@@ -518,8 +518,9 @@ def patch_workspace(kit_root: Path, workspace: Path, force: bool = False) -> Tup
         else:
             log(f"{rel}: {status}")
 
-    # ---- Append-only config: spec_kit_ref ----
+    # ---- Append-only config: spec_kit_ref / hook_mode ----
     _ensure_spec_kit_ref(workspace)
+    _ensure_hook_mode(workspace)
 
     return total, merge_needed
 
@@ -539,6 +540,19 @@ def _ensure_spec_kit_ref(workspace: Path) -> None:
     text = text.rstrip("\n") + f'\nspec_kit_ref: "{default_ref}"\n'
     config_path.write_text(text, encoding="utf-8")
     log(f"Added spec_kit_ref: {default_ref} to .itx-config.yml")
+
+
+def _ensure_hook_mode(workspace: Path) -> None:
+    """Add hook_mode to .itx-config.yml if not already present."""
+    config_path = workspace / ".itx-config.yml"
+    if not config_path.exists():
+        return
+    text = config_path.read_text(encoding="utf-8")
+    if "hook_mode:" in text:
+        return
+    text = text.rstrip("\n") + '\nhook_mode: "hybrid"\n'
+    config_path.write_text(text, encoding="utf-8")
+    log('Added hook_mode: "hybrid" to .itx-config.yml')
 
 
 _TASK_ID_RE = re.compile(r"^T\d{3}\b", re.IGNORECASE)

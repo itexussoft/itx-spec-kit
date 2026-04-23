@@ -2,14 +2,33 @@ schema_version: "1.0"
 description: "Schema for persisted workflow state at .specify/context/workflow-state.yml"
 
 required:
-  - feature
   - current_phase
   - phases
 
 properties:
   feature:
     type: string
-    description: "Feature identifier or slug"
+    description: "Legacy feature identifier or the primary feature slug for feature work"
+
+  workstream_id:
+    type: string
+    description: "Active workstream identifier used by brownfield intake commands and workstream-aware gates"
+
+  work_class:
+    type: string
+    description: "Resolved work class for the active workstream"
+
+  artifact_root:
+    type: string
+    description: "Workspace-relative path under specs/ that contains the active workstream artifacts"
+
+  parent_feature:
+    type: string
+    description: "Optional delivered feature slug that owns or contextualizes this brownfield workstream"
+
+  branch:
+    type: string
+    description: "Recommended branch name for the active workstream"
 
   current_phase:
     type: string

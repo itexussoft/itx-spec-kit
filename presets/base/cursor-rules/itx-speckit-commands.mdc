@@ -63,9 +63,47 @@ forced through the adapter.
 
 ### Gate commands (`after_plan`, `after_tasks`, `after_implement`)
 
-Gate hooks have their own dedicated orchestrator and should NOT go through the runner adapter:
+Gate hooks have their own dedicated wrapper and should NOT go through the runner adapter:
 
 ```bash
-python .specify/extensions/itx-gates/hooks/orchestrator.py \
+python .specify/extensions/itx-gates/hooks/gatectl.py ensure \
   --event <event> --workspace .
 ```
+
+If the current host automatically honors Spec-Kit extension hooks, those hooks
+should fire at phase boundaries. If the current host is a plain agent UI or CLI
+shell that does **not** auto-run extension hooks, you MUST invoke the
+wrapper manually after the corresponding workflow step. The wrapper will
+rerun the orchestrator when gate state is stale or missing, and otherwise
+preserve the last fresh result.
+
+### Mandatory phase-to-gate mapping
+
+- After `/speckit.plan` -> run `after_plan`
+- After `/speckit.tasks` -> run `after_tasks`
+- After `/speckit.implement` -> run `after_implement`
+- After review completion (`/speckit.review.run` or equivalent) -> run `after_review`
+
+### Gate result handling
+
+1. If the gate exits `0` and `.specify/context/gate_feedback.md` does not
+   exist, the gate passed cleanly.
+2. If the gate exits `0` and `gate_feedback.md` exists, Tier 1 findings were
+   recorded. Inspect the file, apply corrections, and rerun the same gate.
+3. If the gate exits non-zero, treat it as a hard stop. Read
+   `.specify/context/gate_feedback.md` and report the Tier 2 findings clearly
+   to the user before proceeding.
+4. Always surface `.specify/context/last-gate-summary.md` (or summarize its
+   contents) when the host UI might hide shell output.
+
+### Gate-owned artifacts
+
+- `.specify/context/gate_feedback.md`: created when findings exist
+- `.specify/context/execution-brief.md`: refreshed by `after_plan`,
+  `after_tasks`, and `after_review`
+- `.specify/context/audit-log.md`: appended only for high-risk planned actions
+- `.specify/context/gate-state.yml`: latest machine-readable gate snapshot
+- `.specify/context/gate-events.jsonl`: append-only gate execution history
+- `.specify/context/last-gate-summary.md`: latest human-readable gate summary
+
+Do not assume these artifacts exist unless the corresponding gate actually ran.

@@ -7,6 +7,7 @@ import importlib
 import json
 import re
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Sequence, cast
 
@@ -36,6 +37,13 @@ from orchestrator_common import (
     write_gate_feedback,
     _find_plan_files,
     _find_task_files,
+    _load_active_workstream_metadata,
+    append_gate_event,
+    build_gate_state_payload,
+    resolve_gate_input_files,
+    resolve_gate_output_files,
+    write_gate_state,
+    write_last_gate_summary,
 )
 
 
@@ -219,6 +227,7 @@ def main() -> int:
     args = parse_args()
     workspace = Path(args.workspace).resolve()
     event = args.event.strip()
+    started_at = datetime.now(timezone.utc).isoformat()
 
     try:
         config = load_config(workspace)
@@ -229,6 +238,7 @@ def main() -> int:
     policy = load_policy(workspace)
     rule_defaults = policy.get("rules") if isinstance(policy.get("rules"), dict) else {}
     domain = config.get("domain", "base")
+    hook_mode = str(config.get("hook_mode", "hybrid")).strip() or "hybrid"
     findings: List[Finding] = []
     findings.extend(run_generic_checks(config, event, workspace, policy))
     if event == "after_implement":
@@ -287,13 +297,58 @@ def main() -> int:
         except Exception as exc:  # noqa: BLE001
             sys.stderr.write(f"[itx-gates] Warning: execution-brief generation failed: {exc}\n")
 
+    status = "passed"
+    if tier2:
+        status = "tier2"
+        exit_code = 1
+    elif tier1:
+        status = "tier1"
+        exit_code = 0
+    else:
+        exit_code = 0
+
+    input_files = resolve_gate_input_files(workspace, event, policy)
+    output_files = resolve_gate_output_files(workspace, event)
+    workstream = _load_active_workstream_metadata(workspace)
+    write_last_gate_summary(
+        workspace,
+        event=event,
+        status=status,
+        exit_code=exit_code,
+        hook_mode=hook_mode,
+        tier1_count=len(tier1),
+        tier2_count=len(tier2),
+        workstream_id=workstream.get("workstream_id") or workstream.get("feature"),
+        artifact_root=workstream.get("artifact_root"),
+    )
+    output_files = resolve_gate_output_files(workspace, event)
+    completed_at = datetime.now(timezone.utc).isoformat()
+    gate_payload = build_gate_state_payload(
+        workspace=workspace,
+        event=event,
+        status=status,
+        exit_code=exit_code,
+        hook_mode=hook_mode,
+        started_at=started_at,
+        completed_at=completed_at,
+        findings=findings,
+        input_files=input_files,
+        output_files=output_files,
+    )
+    write_gate_state(workspace, gate_payload)
+    append_gate_event(workspace, gate_payload)
+
+    if args.json:
+        sys.stdout.write(json.dumps(gate_payload, indent=2) + "\n")
+        return exit_code
+
     if tier2:
         sys.stderr.write("[itx-gates] Critical gate failure(s):\n")
         sys.stderr.write(json.dumps(tier2, indent=2) + "\n")
-        return 1
+        return exit_code
     if tier1:
         sys.stdout.write("[itx-gates] Non-critical failures captured for auto-correction.\n")
-        return 0
+        return exit_code
 
     sys.stdout.write("[itx-gates] Gates passed.\n")
-    return 0
+    return exit_code
