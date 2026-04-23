@@ -535,6 +535,14 @@ def _entry_tags(entry: Dict[str, Any]) -> List[str]:
     return list(dict.fromkeys(tags))
 
 
+def _entry_anti_tags(entry: Dict[str, Any]) -> List[str]:
+    raw = entry.get("anti_tags")
+    if not isinstance(raw, list):
+        return []
+    anti_tags = [str(item).strip().lower() for item in raw if str(item).strip()]
+    return list(dict.fromkeys(anti_tags))
+
+
 def _entry_phases(entry: Dict[str, Any]) -> set[str]:
     raw = entry.get("phases")
     if not isinstance(raw, list):
@@ -554,22 +562,43 @@ def _tokenize_router_text(text: str) -> set[str]:
     return {token.lower() for token in re.findall(r"[a-zA-Z0-9][a-zA-Z0-9_-]*", text)}
 
 
-def _score_entry(tags: Sequence[str], text_tokens: set[str], text_lower: str) -> int:
-    score = 0
-    for tag in tags:
-        normalized = tag.strip().lower()
+def _match_weight(terms: Sequence[str], text_tokens: set[str], text_lower: str) -> int:
+    weight = 0
+    for term in terms:
+        normalized = term.strip().lower()
         if not normalized:
             continue
         variant = normalized.replace("_", " ").replace("-", " ")
         if normalized in text_tokens:
-            score += 3
+            weight += 3
             continue
         if variant in text_lower or normalized in text_lower:
-            score += 2
+            weight += 2
             continue
         if any(part in text_tokens for part in normalized.split("-")):
-            score += 1
-    return score
+            weight += 1
+    return weight
+
+
+def _score_entry(tags: Sequence[str], anti_tags: Sequence[str], text_tokens: set[str], text_lower: str) -> int:
+    positive = _match_weight(tags, text_tokens, text_lower)
+    negative = _match_weight(anti_tags, text_tokens, text_lower)
+    return positive - negative
+
+
+def _min_relevance_threshold(config: Dict[str, Any], policy: Dict[str, Any]) -> int:
+    knowledge_cfg = config.get("knowledge") if isinstance(config.get("knowledge"), dict) else {}
+    routing_cfg = knowledge_cfg.get("routing") if isinstance(knowledge_cfg.get("routing"), dict) else {}
+    raw_cfg = routing_cfg.get("min_relevance_score")
+    if isinstance(raw_cfg, int) and raw_cfg >= 0:
+        return raw_cfg
+
+    knowledge_policy = policy.get("knowledge") if isinstance(policy.get("knowledge"), dict) else {}
+    routing_policy = knowledge_policy.get("routing") if isinstance(knowledge_policy.get("routing"), dict) else {}
+    raw_policy = routing_policy.get("min_relevance_score")
+    if isinstance(raw_policy, int) and raw_policy >= 0:
+        return raw_policy
+    return 3
 
 
 def _router_source_text(plan_files: Sequence[Path], task_files: Sequence[Path], event: str) -> str:
@@ -604,6 +633,7 @@ def _manifest_available_entries(
                 "category": category,
                 "source": source,
                 "tags": _entry_tags(entry),
+                "anti_tags": _entry_anti_tags(entry),
                 "phases": sorted(_entry_phases(entry)),
                 "token_estimate": _entry_token_estimate(entry),
             }
@@ -620,6 +650,7 @@ def _manifest_available_entries(
                     "category": category,
                     "source": file_path,
                     "tags": [],
+                    "anti_tags": [],
                     "phases": ["after_plan", "after_tasks", "after_review"],
                     "token_estimate": 250,
                 }
@@ -683,6 +714,7 @@ def _sync_lazy_knowledge(config: Dict[str, Any], workspace: Path, policy: Dict[s
 
     _ = store_root
     available = _manifest_available_entries(workspace=workspace, manifest_files=manifest_files, target_roots=target_roots)
+    min_score = _min_relevance_threshold(config, policy)
 
     auto_requested: List[str] = []
     if not explicit_none:
@@ -694,10 +726,11 @@ def _sync_lazy_knowledge(config: Dict[str, Any], workspace: Path, policy: Dict[s
             if phases and event not in phases:
                 continue
             tags = [str(tag).strip().lower() for tag in entry.get("tags", []) if str(tag).strip()]
-            if not tags:
+            anti_tags = [str(tag).strip().lower() for tag in entry.get("anti_tags", []) if str(tag).strip()]
+            if not tags and not anti_tags:
                 continue
-            score = _score_entry(tags, text_tokens, router_text)
-            if score <= 0:
+            score = _score_entry(tags, anti_tags, text_tokens, router_text)
+            if score < min_score:
                 continue
             ranked.append((score, int(entry.get("token_estimate", 250)), name))
         ranked.sort(key=lambda item: (-item[0], item[1], item[2]))

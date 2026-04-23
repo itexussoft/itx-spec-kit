@@ -1,3 +1,28 @@
+---
+tags:
+  - ledger
+  - command
+  - idempotency
+  - handler
+  - transaction
+  - account
+anti_tags:
+  - react
+  - ui
+  - frontend
+  - component
+  - button
+  - browser
+  - palette
+  - shortcut
+  - keyboard
+  - menu
+phases:
+  - after_plan
+  - after_tasks
+  - after_review
+---
+
 # Command Pattern: Ledger Mutations
 
 > **Domain:** Fintech — Banking

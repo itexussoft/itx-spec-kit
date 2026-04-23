@@ -191,6 +191,10 @@ placeholder_markers:
   - "e.g.,"
   - "MANDATORY"
 
+knowledge:
+  routing:
+    min_relevance_score: 3
+
 gate:
   default_max_tier1_retries: 3
   heuristic_retry_escalates: false

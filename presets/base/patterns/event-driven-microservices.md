@@ -1,3 +1,30 @@
+---
+tags:
+  - event
+  - messaging
+  - broker
+  - consumer
+  - producer
+  - topic
+  - queue
+  - command
+anti_tags:
+  - react
+  - ui
+  - frontend
+  - component
+  - click
+  - browser
+  - dom
+  - css
+  - html
+  - toast
+phases:
+  - after_plan
+  - after_tasks
+  - after_review
+---
+
 # Event-Driven Microservices
 
 > **Applicability:** Projects requiring independent deployment, scaling, and

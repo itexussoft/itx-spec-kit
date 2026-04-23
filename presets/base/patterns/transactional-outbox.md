@@ -1,3 +1,28 @@
+---
+tags:
+  - transaction
+  - outbox
+  - event
+  - broker
+  - database
+  - relay
+anti_tags:
+  - react
+  - ui
+  - frontend
+  - component
+  - button
+  - click
+  - toast
+  - browser
+  - css
+  - html
+phases:
+  - after_plan
+  - after_tasks
+  - after_review
+---
+
 # Transactional Outbox
 
 > **Applicability:** Any service that must atomically update its database

@@ -1,3 +1,31 @@
+---
+tags:
+  - cqrs
+  - order
+  - sequencing
+  - command
+  - aggregate
+  - projection
+  - outbox
+anti_tags:
+  - react
+  - ui
+  - frontend
+  - component
+  - table
+  - grid
+  - modal
+  - button
+  - toast
+  - browser
+  - css
+  - html
+phases:
+  - after_plan
+  - after_tasks
+  - after_review
+---
+
 # CQRS with Order Sequencing — Fintech Trading
 
 > **Domain:** Fintech Trading

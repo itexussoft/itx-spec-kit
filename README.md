@@ -1,23 +1,33 @@
 # itexus-spec-kit
 
 `itexus-spec-kit` is an Itexus delivery kit built on top of `github/spec-kit`.
-It combines:
+Deterministic Context Routing for AI Agents combines:
 
 - a base preset with templates, policy, governance files, and knowledge assets
 - domain overlays for `fintech-trading`, `fintech-banking`, `healthcare`, and `saas-platform`
 - local extensions for brownfield workflows and quality gates
 - bootstrap and patch scripts that materialize everything into a downstream workspace
 
-Current kit version: `0.4.0` from [catalog/index.json](/Users/sprivalov/itexus/src/itx-spec-kit/catalog/index.json).
+Current kit version: `0.4.1` from [catalog/index.json](/Users/sprivalov/itexus/src/itx-spec-kit/catalog/index.json).
 
 **What It Gives You**
 
 - Opinionated plan/templates for feature, patch, refactor, bugfix, migration, spike, modify, hotfix, and deprecate flows
-- Brownfield intake commands via [extensions/itx-brownfield-workflows/extension.yml](/Users/sprivalov/itexus/src/itx-spec-kit/extensions/itx-brownfield-workflows/extension.yml)
+- brownfield intake commands via [extensions/itx-brownfield-workflows/extension.yml](/Users/sprivalov/itexus/src/itx-spec-kit/extensions/itx-brownfield-workflows/extension.yml)
 - Runtime quality gates via [extensions/itx-gates/extension.yml](/Users/sprivalov/itexus/src/itx-spec-kit/extensions/itx-gates/extension.yml)
+- Deterministic Context Routing for AI Agents, with thresholded tag matching and anti-tag suppression to reduce prompt noise
 - Workspace bootstrapping via [scripts/itx_init.py](/Users/sprivalov/itexus/src/itx-spec-kit/scripts/itx_init.py)
 - Safe forward updates for existing workspaces via [scripts/patch.py](/Users/sprivalov/itexus/src/itx-spec-kit/scripts/patch.py)
 - Opt-in architecture assurance, mutation testing, smell guidance, and temporal-fakes scaffolding
+
+**Headline Feature: Deterministic Context Routing**
+
+The JIT Context Router now promotes knowledge deterministically instead of relying on broad lexical overlap alone.
+
+- Knowledge files can declare `tags` and `anti_tags` in frontmatter.
+- The router scores positive matches from `tags`, subtracts penalties from `anti_tags`, and enforces a minimum relevance threshold before promoting a file into active `.specify/` context.
+- This sharply reduces false positives such as backend ledger, saga, CLI, or tenant-isolation guidance being pulled into frontend React work just because a request contains overloaded words like `transaction`, `event`, `command`, or `context`.
+- The result is smaller, cleaner prompt context for AI agents, with less prompt noise, fewer accidental architecture detours, and better retention of the task that actually matters.
 
 **Quick Start**
 
@@ -67,6 +77,7 @@ make validate-catalog
 - `--hook-mode`: `auto`, `manual`, or `hybrid`
 
 `lazy` knowledge mode stages pattern content into `.specify/.knowledge-store/` and promotes relevant files later. `eager` copies everything directly into active `.specify/` folders.
+In `lazy` mode, deterministic routing uses `tags`, `anti_tags`, and a minimum relevance threshold to decide what the AI agent should actually load.
 
 **Commands and Workflow**
 
@@ -89,6 +100,7 @@ For brownfield work, start with one of:
 - `/speckit.deprecate`
 
 Those commands establish workstream metadata and then hand off to `/speckit.plan`.
+They are not guaranteed upstream core commands; they are local intake helpers that route brownfield work into the standard planning flow.
 
 **Quality Gates**
 

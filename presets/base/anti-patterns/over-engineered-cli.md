@@ -1,3 +1,30 @@
+---
+tags:
+  - cli
+  - orchestrator
+  - command
+  - workflow
+  - automation
+  - subprocess
+anti_tags:
+  - react
+  - ui
+  - frontend
+  - component
+  - palette
+  - toolbar
+  - menu
+  - shortcut
+  - modal
+  - browser
+  - css
+  - html
+phases:
+  - after_plan
+  - after_tasks
+  - after_review
+---
+
 # Over-Engineered CLI Tool
 
 > **Applicability:** CLI tools, automation scripts, workflow engines, and

@@ -3,7 +3,7 @@ schema_version: "1.0"
 preset:
   id: "saas-platform"
   name: "Itexus SaaS Platform Preset"
-  version: 0.4.0
+  version: 0.4.1
   description: "Multi-tenancy, federated identity, and white-label overlay for Itexus spec-driven delivery"
   author: "itexus"
   repository: "https://github.com/sprivalov/itexus-spec-kit"

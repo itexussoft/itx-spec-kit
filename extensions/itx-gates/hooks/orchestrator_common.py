@@ -225,6 +225,7 @@ _DEFAULT_POLICY: Dict[str, Any] = {
         },
     },
     "placeholder_markers": ["_e.g.,", "e.g.,", "MANDATORY"],
+    "knowledge": {"routing": {"min_relevance_score": 3}},
     "gate": {"default_max_tier1_retries": 3, "heuristic_retry_escalates": False, "auto_retry": {"max_attempts": 3}},
     "quality": {
         "architecture": {

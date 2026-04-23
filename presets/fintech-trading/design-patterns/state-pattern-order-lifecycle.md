@@ -1,3 +1,31 @@
+---
+tags:
+  - state-machine
+  - order
+  - lifecycle
+  - settlement
+  - exchange
+  - risk
+  - transition
+anti_tags:
+  - react
+  - ui
+  - frontend
+  - component
+  - table
+  - grid
+  - modal
+  - button
+  - toast
+  - browser
+  - css
+  - html
+phases:
+  - after_plan
+  - after_tasks
+  - after_review
+---
+
 # State Pattern: Trading Order Lifecycle
 
 > **Domain:** Fintech — Trading

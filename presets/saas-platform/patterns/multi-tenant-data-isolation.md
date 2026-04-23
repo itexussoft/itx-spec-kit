@@ -1,3 +1,31 @@
+---
+tags:
+  - tenant
+  - isolation
+  - rls
+  - schema
+  - database
+  - queue
+  - cache
+anti_tags:
+  - react
+  - ui
+  - frontend
+  - component
+  - theme
+  - theming
+  - branding
+  - logo
+  - color
+  - typography
+  - css
+  - html
+phases:
+  - after_plan
+  - after_tasks
+  - after_review
+---
+
 # Multi-Tenant Data Isolation — SaaS Platform
 
 > **Domain:** SaaS Platform  

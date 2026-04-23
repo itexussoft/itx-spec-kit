@@ -1,3 +1,27 @@
+---
+tags:
+  - saga
+  - transaction
+  - compensation
+  - orchestrator
+  - transfer
+  - idempotency
+anti_tags:
+  - react
+  - ui
+  - frontend
+  - component
+  - button
+  - toast
+  - browser
+  - css
+  - html
+phases:
+  - after_plan
+  - after_tasks
+  - after_review
+---
+
 # Saga — Distributed Transactions for Inter-Account Transfers
 
 > **Domain:** Fintech Banking

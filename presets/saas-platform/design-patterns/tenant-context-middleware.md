@@ -1,3 +1,30 @@
+---
+tags:
+  - tenant
+  - context
+  - middleware
+  - propagation
+  - request
+  - session
+  - header
+anti_tags:
+  - react
+  - ui
+  - frontend
+  - component
+  - provider
+  - hook
+  - theme
+  - modal
+  - browser
+  - css
+  - html
+phases:
+  - after_plan
+  - after_tasks
+  - after_review
+---
+
 # Tenant Context Middleware — Resolve and Propagate Tenant Scope
 
 > **Domain:** SaaS Platform  

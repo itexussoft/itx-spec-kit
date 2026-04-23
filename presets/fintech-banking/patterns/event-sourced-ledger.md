@@ -1,3 +1,25 @@
+---
+tags:
+  - ledger
+  - transaction
+  - reconciliation
+  - event-sourcing
+  - account
+anti_tags:
+  - react
+  - ui
+  - frontend
+  - component
+  - toast
+  - browser
+  - css
+  - html
+phases:
+  - after_plan
+  - after_tasks
+  - after_review
+---
+
 # Event-Sourced Ledger — Fintech Banking
 
 > **Domain:** Fintech Banking

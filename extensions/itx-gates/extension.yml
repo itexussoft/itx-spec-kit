@@ -3,7 +3,7 @@ schema_version: "1.0"
 extension:
   id: "itx-gates"
   name: "itexus-spec-kit itx-gates"
-  version: 0.4.0
+  version: 0.4.1
   description: "Gate extension where gatectl.py is host-facing and orchestrator.py remains the validator runtime"
   author: "itexus"
   repository: "https://github.com/sprivalov/itexus-spec-kit"

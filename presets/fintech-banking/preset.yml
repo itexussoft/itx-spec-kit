@@ -3,7 +3,7 @@ schema_version: "1.0"
 preset:
   id: "fintech-banking"
   name: "Itexus Fintech Banking Preset"
-  version: 0.4.0
+  version: 0.4.1
   description: "Banking domain overlay for Itexus spec-driven delivery"
   author: "itexus"
   repository: "https://github.com/sprivalov/itexus-spec-kit"

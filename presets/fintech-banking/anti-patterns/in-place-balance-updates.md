@@ -1,3 +1,29 @@
+---
+tags:
+  - balance
+  - ledger
+  - update
+  - mutation
+  - account
+  - transaction
+anti_tags:
+  - react
+  - ui
+  - frontend
+  - component
+  - widget
+  - dashboard
+  - button
+  - toast
+  - browser
+  - css
+  - html
+phases:
+  - after_plan
+  - after_tasks
+  - after_review
+---
+
 # Anti-Pattern: In-Place Balance Updates
 
 > **Domain:** Fintech — Banking

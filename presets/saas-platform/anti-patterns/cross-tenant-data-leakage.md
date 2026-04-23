@@ -1,3 +1,31 @@
+---
+tags:
+  - tenant
+  - leakage
+  - isolation
+  - cache
+  - query
+  - header
+  - tenant_id
+anti_tags:
+  - react
+  - ui
+  - frontend
+  - component
+  - theme
+  - theming
+  - branding
+  - logo
+  - color
+  - typography
+  - css
+  - html
+phases:
+  - after_plan
+  - after_tasks
+  - after_review
+---
+
 # Cross-Tenant Data Leakage — Anti-Pattern
 
 > **Domain:** SaaS Platform  

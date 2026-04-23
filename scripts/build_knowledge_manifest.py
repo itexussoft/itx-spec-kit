@@ -67,6 +67,14 @@ def _derive_tags(*, name: str, description: str, category: str, frontmatter: dic
     return sorted(dict.fromkeys(tag for tag in tags if tag))
 
 
+def _derive_anti_tags(frontmatter: dict) -> list[str]:
+    raw_anti_tags = frontmatter.get("anti_tags")
+    if not isinstance(raw_anti_tags, list):
+        return []
+    anti_tags = [str(tag).strip().lower() for tag in raw_anti_tags if str(tag).strip()]
+    return sorted(dict.fromkeys(anti_tags))
+
+
 def _derive_phases(frontmatter: dict) -> list[str]:
     raw_phases = frontmatter.get("phases")
     if isinstance(raw_phases, list):
@@ -116,6 +124,7 @@ def _collect_entries(preset_dir: Path, preset_data: dict) -> list[dict]:
                     "source": str(source),
                     "description": str(item.get("description", "")).strip(),
                     "tags": tags,
+                    "anti_tags": _derive_anti_tags(frontmatter),
                     "phases": phases,
                     "token_estimate": token_estimate,
                 }

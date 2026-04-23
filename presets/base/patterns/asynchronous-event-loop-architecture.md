@@ -1,3 +1,31 @@
+---
+tags:
+  - asynchronous
+  - event-loop
+  - asyncio
+  - sidecar
+  - notification
+  - callback
+  - daemon
+anti_tags:
+  - react
+  - ui
+  - frontend
+  - component
+  - button
+  - click
+  - toast
+  - modal
+  - browser
+  - dom
+  - css
+  - html
+phases:
+  - after_plan
+  - after_tasks
+  - after_review
+---
+
 # Asynchronous Event-Loop Architecture (AI-First)
 
 > **Applicability:** Long-running integration daemons, notification bridges, log
