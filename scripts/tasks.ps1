@@ -14,9 +14,16 @@ switch ($Task) {
   "compile" {
     $files = @(
       "extensions/itx-gates/hooks/orchestrator.py",
+      "extensions/itx-gates/hooks/core_orchestrator/base.py",
+      "extensions/itx-gates/hooks/core_orchestrator/github_spec_kit.py",
+      "extensions/itx-gates/hooks/security_providers/__init__.py",
+      "extensions/itx-gates/hooks/security_providers/semgrep_provider.py",
+      "extensions/itx-gates/hooks/security_providers/bandit_provider.py",
+      "extensions/itx-gates/hooks/security_providers/noop_provider.py",
       "extensions/itx-gates/hooks/validators/__init__.py",
       "extensions/itx-gates/hooks/validators/trading_ast.py",
       "extensions/itx-gates/hooks/validators/banking_heuristic.py",
+      "extensions/itx-gates/hooks/validators/sast_validator.py",
       "extensions/itx-gates/hooks/validators/health_regex.py",
       "extensions/itx-gates/hooks/validators/saas_platform_heuristic.py",
       "scripts/validate_catalog.py",
@@ -33,7 +40,9 @@ switch ($Task) {
       "tests/test_validate_catalog.py",
       "tests/test_itx_init.py",
       "tests/test_patch.py",
-      "tests/test_saas_validator.py"
+      "tests/test_saas_validator.py",
+      "tests/test_sast_and_context_router.py",
+      "tests/test_itx_gates_runtime_state.py"
     )
     foreach ($f in $files) {
       & $PythonCmd -m py_compile (Join-Path $Root $f)

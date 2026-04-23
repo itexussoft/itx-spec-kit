@@ -160,3 +160,9 @@ legacy_compatibility:
   plan_filename_work_class:
     system-design-plan.md: feature
     patch-plan.md: patch
+
+gate:
+  auto_retry:
+    max_attempts: 3
+    correction_artifact: ".specify/context/gate-failure-report.md"
+    correction_tag: "<SYSTEM_CORRECTION>"

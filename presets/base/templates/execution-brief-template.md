@@ -35,7 +35,8 @@ generated_at: "YYYY-MM-DDTHH:MM:SS+00:00"
 - <max 10 entries>
 
 ## Selected Patterns To Load
-- <pattern-file.md | none>
+- <router-selected-file.md | explicit selected_patterns override | none>
+- Keep combined loaded context under ~15,000 tokens in lazy mode.
 
 ## Targeted Micro-Overlays
 - <ACL / security / TDD overlays only when relevant to this plan>

@@ -194,6 +194,21 @@ placeholder_markers:
 gate:
   default_max_tier1_retries: 3
   heuristic_retry_escalates: false
+  auto_retry:
+    max_attempts: 3
+
+quality:
+  security:
+    enabled: false
+    provider: noop
+    on_missing_binary: warn
+    compat_heuristic_fallback: false
+    domains:
+      fintech-banking:
+        enabled: true
+        provider: semgrep
+        on_missing_binary: warn
+        compat_heuristic_fallback: true
 
 rules:
   e2e-test-presence:
@@ -236,6 +251,14 @@ rules:
     severity: tier1
     confidence: heuristic
     remediation_owner: security-team
+  banking-sql-injection-ledger-query:
+    severity: tier2
+    confidence: deterministic
+    remediation_owner: security-team
+  banking-raw-pan-storage:
+    severity: tier1
+    confidence: deterministic
+    remediation_owner: security-team
   banking-ledger-inplace-mutation:
     severity: tier2
     confidence: deterministic
@@ -252,6 +275,30 @@ rules:
     severity: tier1
     confidence: heuristic
     remediation_owner: domain-team
+  sast-provider-unavailable:
+    severity: tier1
+    confidence: heuristic
+    remediation_owner: security-team
+  sast-provider-failed:
+    severity: tier1
+    confidence: heuristic
+    remediation_owner: security-team
+  sast-provider-output-invalid:
+    severity: tier1
+    confidence: heuristic
+    remediation_owner: security-team
+  sast-ruleset-missing:
+    severity: tier1
+    confidence: heuristic
+    remediation_owner: security-team
+  sast-provider-unknown:
+    severity: tier1
+    confidence: heuristic
+    remediation_owner: security-team
+  sast-provider-fallback-active:
+    severity: tier1
+    confidence: heuristic
+    remediation_owner: security-team
   healthcare-phi-logging:
     severity: tier1
     confidence: heuristic

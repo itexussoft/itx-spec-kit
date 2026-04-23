@@ -27,7 +27,7 @@ HOOK_MODES = {"auto", "manual", "hybrid"}
 
 DOMAIN_VALIDATORS: Dict[str, str] = {
     "fintech-trading": "validators.trading_ast",
-    "fintech-banking": "validators.banking_heuristic",
+    "fintech-banking": "validators.sast_validator",
     "healthcare": "validators.health_regex",
     "saas-platform": "validators.saas_platform_heuristic",
 }
@@ -225,7 +225,23 @@ _DEFAULT_POLICY: Dict[str, Any] = {
         },
     },
     "placeholder_markers": ["_e.g.,", "e.g.,", "MANDATORY"],
-    "gate": {"default_max_tier1_retries": 3, "heuristic_retry_escalates": False},
+    "gate": {"default_max_tier1_retries": 3, "heuristic_retry_escalates": False, "auto_retry": {"max_attempts": 3}},
+    "quality": {
+        "security": {
+            "enabled": False,
+            "provider": "noop",
+            "on_missing_binary": "warn",
+            "compat_heuristic_fallback": False,
+            "domains": {
+                "fintech-banking": {
+                    "enabled": True,
+                    "provider": "semgrep",
+                    "on_missing_binary": "warn",
+                    "compat_heuristic_fallback": True,
+                }
+            },
+        }
+    },
     "rules": {
         "e2e-test-presence": {
             "severity": "tier1",
@@ -277,6 +293,16 @@ _DEFAULT_POLICY: Dict[str, Any] = {
             "confidence": "heuristic",
             "remediation_owner": "security-team",
         },
+        "banking-sql-injection-ledger-query": {
+            "severity": "tier2",
+            "confidence": "deterministic",
+            "remediation_owner": "security-team",
+        },
+        "banking-raw-pan-storage": {
+            "severity": "tier1",
+            "confidence": "deterministic",
+            "remediation_owner": "security-team",
+        },
         "banking-ledger-inplace-mutation": {
             "severity": "tier2",
             "confidence": "deterministic",
@@ -296,6 +322,36 @@ _DEFAULT_POLICY: Dict[str, Any] = {
             "severity": "tier1",
             "confidence": "heuristic",
             "remediation_owner": "domain-team",
+        },
+        "sast-provider-unavailable": {
+            "severity": "tier1",
+            "confidence": "heuristic",
+            "remediation_owner": "security-team",
+        },
+        "sast-provider-failed": {
+            "severity": "tier1",
+            "confidence": "heuristic",
+            "remediation_owner": "security-team",
+        },
+        "sast-provider-output-invalid": {
+            "severity": "tier1",
+            "confidence": "heuristic",
+            "remediation_owner": "security-team",
+        },
+        "sast-ruleset-missing": {
+            "severity": "tier1",
+            "confidence": "heuristic",
+            "remediation_owner": "security-team",
+        },
+        "sast-provider-unknown": {
+            "severity": "tier1",
+            "confidence": "heuristic",
+            "remediation_owner": "security-team",
+        },
+        "sast-provider-fallback-active": {
+            "severity": "tier1",
+            "confidence": "heuristic",
+            "remediation_owner": "security-team",
         },
         "healthcare-phi-logging": {
             "severity": "tier1",
@@ -780,6 +836,14 @@ RULE_REMEDIATION_HINTS: Dict[str, str] = {
     "banking-idempotency-key-missing": "Require and persist idempotency keys for payment commands/endpoints.",
     "banking-payment-boundary-controls-missing": "Add explicit SCA and authorization controls at payment entrypoints.",
     "banking-psd2-sca-missing-advisory": "Document or implement SCA controls (middleware/policy/decorator) for payment flows.",
+    "banking-sql-injection-ledger-query": "Use parameterized queries for ledger/account SQL paths and remove string interpolation.",
+    "banking-raw-pan-storage": "Remove raw PAN persistence and enforce tokenization/masking controls.",
+    "sast-provider-unavailable": "Install and expose the configured SAST binary locally or switch provider for this workspace.",
+    "sast-provider-failed": "Inspect SAST stderr output and fix provider configuration before rerunning gates.",
+    "sast-provider-output-invalid": "Validate provider output format and pinned version compatibility.",
+    "sast-ruleset-missing": "Restore the configured SAST ruleset path or configure a valid ruleset location.",
+    "sast-provider-unknown": "Set quality.security.provider to one of: semgrep, bandit, noop.",
+    "sast-provider-fallback-active": "Install/fix Semgrep to remove compatibility fallback and rely on deterministic SAST output.",
     "saas-tenant-filter-missing": "Add tenant_id filters or RLS session variables for all tenant-scoped queries.",
     "saas-global-cache-key": "Namespace cache keys with tenant id (e.g. t:{tenant_id}:...) to prevent cross-tenant leakage.",
 }
@@ -788,6 +852,8 @@ RULE_DEFAULT_META: Dict[str, Dict[str, str]] = {
     "e2e-test-presence": {"confidence": "deterministic", "remediation_owner": "feature-team"},
     "tasks-presence": {"confidence": "deterministic", "remediation_owner": "feature-team"},
     "plan-section-missing": {"confidence": "deterministic", "remediation_owner": "feature-team"},
+    "banking-sql-injection-ledger-query": {"confidence": "deterministic", "remediation_owner": "security-team"},
+    "sast-provider-unavailable": {"confidence": "heuristic", "remediation_owner": "security-team"},
 }
 
 

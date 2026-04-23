@@ -522,7 +522,106 @@ def _extract_selected_patterns(plan_text: str, known_filenames: set[str] | None 
     return (found if found else None), True
 
 
-def _sync_lazy_knowledge(config: Dict[str, Any], workspace: Path, policy: Dict[str, Any]) -> List[Finding]:
+def _entry_tags(entry: Dict[str, Any]) -> List[str]:
+    raw = entry.get("tags")
+    if not isinstance(raw, list):
+        return []
+    tags = [str(item).strip().lower() for item in raw if str(item).strip()]
+    return list(dict.fromkeys(tags))
+
+
+def _entry_phases(entry: Dict[str, Any]) -> set[str]:
+    raw = entry.get("phases")
+    if not isinstance(raw, list):
+        return {"after_plan", "after_tasks", "after_review"}
+    phases = {str(item).strip() for item in raw if str(item).strip()}
+    return phases or {"after_plan", "after_tasks", "after_review"}
+
+
+def _entry_token_estimate(entry: Dict[str, Any]) -> int:
+    raw = entry.get("token_estimate")
+    if isinstance(raw, int) and raw > 0:
+        return raw
+    return 250
+
+
+def _tokenize_router_text(text: str) -> set[str]:
+    return {token.lower() for token in re.findall(r"[a-zA-Z0-9][a-zA-Z0-9_-]*", text)}
+
+
+def _score_entry(tags: Sequence[str], text_tokens: set[str], text_lower: str) -> int:
+    score = 0
+    for tag in tags:
+        normalized = tag.strip().lower()
+        if not normalized:
+            continue
+        variant = normalized.replace("_", " ").replace("-", " ")
+        if normalized in text_tokens:
+            score += 3
+            continue
+        if variant in text_lower or normalized in text_lower:
+            score += 2
+            continue
+        if any(part in text_tokens for part in normalized.split("-")):
+            score += 1
+    return score
+
+
+def _router_source_text(plan_files: Sequence[Path], task_files: Sequence[Path], event: str) -> str:
+    chunks: List[str] = []
+    for plan_file in plan_files:
+        chunks.append(plan_file.read_text(encoding="utf-8", errors="ignore"))
+    if event in {"after_tasks", "after_review"}:
+        for task_file in task_files:
+            chunks.append(task_file.read_text(encoding="utf-8", errors="ignore"))
+    return "\n".join(chunks).lower()
+
+
+def _manifest_available_entries(
+    *,
+    workspace: Path,
+    manifest_files: Dict[str, Dict[str, Any]],
+    target_roots: Dict[str, Path],
+) -> Dict[str, Dict[str, Any]]:
+    available: Dict[str, Dict[str, Any]] = {}
+    for name_key, entry in manifest_files.items():
+        if not isinstance(name_key, str) or not isinstance(entry, dict):
+            sys.stderr.write("[itx-gates] Warning: malformed knowledge-manifest.json entry ignored.\n")
+            continue
+        source_raw = entry.get("source", "")
+        category = str(entry.get("category", "")).strip()
+        if not isinstance(source_raw, str):
+            sys.stderr.write(f"[itx-gates] Warning: malformed manifest source for '{name_key}' ignored.\n")
+            continue
+        source = Path(source_raw)
+        if source.exists() and category in target_roots:
+            available[name_key.lower()] = {
+                "category": category,
+                "source": source,
+                "tags": _entry_tags(entry),
+                "phases": sorted(_entry_phases(entry)),
+                "token_estimate": _entry_token_estimate(entry),
+            }
+
+    store_root = workspace / ".specify" / ".knowledge-store"
+    for category in target_roots:
+        source_dir = store_root / category
+        if not source_dir.exists():
+            continue
+        for file_path in source_dir.glob("*.md"):
+            key = file_path.name.lower()
+            if key not in available:
+                available[key] = {
+                    "category": category,
+                    "source": file_path,
+                    "tags": [],
+                    "phases": ["after_plan", "after_tasks", "after_review"],
+                    "token_estimate": 250,
+                }
+    return available
+
+
+def _sync_lazy_knowledge(config: Dict[str, Any], workspace: Path, policy: Dict[str, Any], *, event: str = "after_plan") -> List[Finding]:
     knowledge = config.get("knowledge") or {}
     if str(knowledge.get("mode", "eager")).strip().lower() != "lazy":
         return []
@@ -541,8 +640,9 @@ def _sync_lazy_knowledge(config: Dict[str, Any], workspace: Path, policy: Dict[s
     known_pattern_filenames = {name.lower() for name in manifest_files}
     known_names_for_fallback = known_pattern_filenames or None
 
-    all_requested: set[str] = set()
+    explicit_requested: set[str] = set()
     has_any_selection = False
+    explicit_none = False
     used_regex_fallback = False
     for plan_file in plan_files:
         text = plan_file.read_text(encoding="utf-8", errors="ignore")
@@ -553,7 +653,9 @@ def _sync_lazy_knowledge(config: Dict[str, Any], workspace: Path, policy: Dict[s
         used_regex_fallback = used_regex_fallback or fallback_used
         if selected is not None:
             has_any_selection = True
-            all_requested.update(selected)
+            if selected == set():
+                explicit_none = True
+            explicit_requested.update(selected)
         elif selection_mode == "required":
             return [
                 {
@@ -567,16 +669,6 @@ def _sync_lazy_knowledge(config: Dict[str, Any], workspace: Path, policy: Dict[s
                 }
             ]
 
-    if not has_any_selection:
-        return []
-    if not all_requested:
-        if used_regex_fallback:
-            sys.stderr.write(
-                "[itx-gates] Warning: detected deprecated inline markdown filename fallback for pattern "
-                "selection. Prefer structured selection blocks: <!-- selected_patterns: file.md, ... -->\n"
-            )
-        return []
-
     store_root = workspace / ".specify" / ".knowledge-store"
     target_roots = {
         "patterns": workspace / ".specify" / "patterns",
@@ -584,28 +676,52 @@ def _sync_lazy_knowledge(config: Dict[str, Any], workspace: Path, policy: Dict[s
         "anti-patterns": workspace / ".specify" / "anti-patterns",
     }
 
-    available: Dict[str, tuple[str, Path]] = {}
-    for name_key, entry in manifest_files.items():
-        if not isinstance(name_key, str) or not isinstance(entry, dict):
-            sys.stderr.write("[itx-gates] Warning: malformed knowledge-manifest.json entry ignored.\n")
-            continue
-        source_raw = entry.get("source", "")
-        category = str(entry.get("category", "")).strip()
-        if not isinstance(source_raw, str):
-            sys.stderr.write(f"[itx-gates] Warning: malformed manifest source for '{name_key}' ignored.\n")
-            continue
-        source = Path(source_raw)
-        if source.exists() and category in target_roots:
-            available[name_key.lower()] = (category, source)
+    _ = store_root
+    available = _manifest_available_entries(workspace=workspace, manifest_files=manifest_files, target_roots=target_roots)
 
-    for category in target_roots:
-        source_dir = store_root / category
-        if not source_dir.exists():
+    auto_requested: List[str] = []
+    if not explicit_none:
+        router_text = _router_source_text(plan_files, _find_task_files(workspace), event)
+        text_tokens = _tokenize_router_text(router_text)
+        ranked: List[tuple[int, int, str]] = []
+        for name, entry in available.items():
+            phases = {str(item).strip() for item in entry.get("phases", []) if str(item).strip()}
+            if phases and event not in phases:
+                continue
+            tags = [str(tag).strip().lower() for tag in entry.get("tags", []) if str(tag).strip()]
+            if not tags:
+                continue
+            score = _score_entry(tags, text_tokens, router_text)
+            if score <= 0:
+                continue
+            ranked.append((score, int(entry.get("token_estimate", 250)), name))
+        ranked.sort(key=lambda item: (-item[0], item[1], item[2]))
+        auto_requested = [name for _, _, name in ranked]
+
+    token_budget = 15000
+    total_tokens = 0
+    all_requested: set[str] = set()
+    for name in sorted(explicit_requested):
+        entry = available.get(name)
+        if entry is None:
+            all_requested.add(name)
             continue
-        for file_path in source_dir.glob("*.md"):
-            key = file_path.name.lower()
-            if key not in available:
-                available[key] = (category, file_path)
+        estimate = int(entry.get("token_estimate", 250))
+        if total_tokens + estimate <= token_budget:
+            all_requested.add(name)
+            total_tokens += estimate
+
+    for name in auto_requested:
+        if name in all_requested:
+            continue
+        entry = available.get(name)
+        if entry is None:
+            continue
+        estimate = int(entry.get("token_estimate", 250))
+        if total_tokens + estimate > token_budget:
+            continue
+        all_requested.add(name)
+        total_tokens += estimate
 
     unresolved = sorted(name for name in all_requested if name not in available)
     findings: List[Finding] = []
@@ -620,10 +736,13 @@ def _sync_lazy_knowledge(config: Dict[str, Any], workspace: Path, policy: Dict[s
 
     promoted: list[str] = []
     for name in sorted(all_requested):
-        resolved = available.get(name)
-        if resolved is None:
+        entry = available.get(name)
+        if entry is None:
             continue
-        category, source_path = resolved
+        category = str(entry.get("category", "")).strip()
+        source_path = entry.get("source")
+        if not isinstance(source_path, Path):
+            continue
         target_dir = target_roots[category]
         target_dir.mkdir(parents=True, exist_ok=True)
         target_path = target_dir / source_path.name
@@ -635,14 +754,41 @@ def _sync_lazy_knowledge(config: Dict[str, Any], workspace: Path, policy: Dict[s
                 shutil.copy2(source_path, target_path)
         promoted.append(name)
 
+    known_names = set(available.keys())
+    for category, target_dir in target_roots.items():
+        if not target_dir.exists():
+            continue
+        for file_path in target_dir.glob("*.md"):
+            lowered = file_path.name.lower()
+            if lowered not in known_names:
+                continue
+            if lowered in promoted:
+                continue
+            file_path.unlink()
+
     if promoted:
-        sys.stdout.write(f"[itx-gates] Lazy knowledge: promoted {len(promoted)} pattern(s): {', '.join(promoted)}\n")
+        sys.stdout.write(
+            f"[itx-gates] Lazy knowledge ({event}): promoted {len(promoted)} file(s) within ~{total_tokens} tokens: {', '.join(promoted)}\n"
+        )
+    elif has_any_selection and explicit_none:
+        sys.stdout.write("[itx-gates] Lazy knowledge: explicit selected_patterns=none kept active context empty.\n")
     if used_regex_fallback:
         sys.stderr.write(
             "[itx-gates] Warning: detected deprecated inline markdown filename fallback for pattern "
             "selection. Prefer structured selection blocks: <!-- selected_patterns: file.md, ... -->\n"
         )
     return findings
+
+
+def _active_lazy_knowledge_files(workspace: Path) -> List[str]:
+    active: List[str] = []
+    for rel in ("patterns", "design-patterns", "anti-patterns"):
+        root = workspace / ".specify" / rel
+        if not root.exists():
+            continue
+        for file_path in sorted(root.glob("*.md")):
+            active.append(file_path.name.lower())
+    return list(dict.fromkeys(active))
 
 
 def _generate_execution_brief(workspace: Path, config: Dict[str, Any], policy: Dict[str, Any]) -> None:
@@ -682,7 +828,11 @@ def _generate_execution_brief(workspace: Path, config: Dict[str, Any], policy: D
     known_names = {str(name).lower() for name in manifest_files} if isinstance(manifest_files, dict) else None
     selected, _ = _extract_selected_patterns(plan_text, known_names or None)
     selected_patterns = sorted(selected) if selected is not None else []
-    if selected == set():
+    if knowledge_mode == "lazy":
+        active_patterns = _active_lazy_knowledge_files(workspace)
+        if active_patterns:
+            selected_patterns = active_patterns
+    if selected == set() and not selected_patterns:
         selected_patterns = ["none"]
 
     objective: List[str] = []

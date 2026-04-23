@@ -122,7 +122,7 @@ itexus-spec-kit/
 
 During `itx-init`, the `--knowledge-mode` flag controls how pattern files are staged:
 
-- **`lazy` (default):** Pattern, design-pattern, and anti-pattern markdown files are staged into `.specify/.knowledge-store/` (gitignored). They are **not** placed in the active `.specify/` directories until the `after_plan` gate promotes files that the plan explicitly selects. A `knowledge-manifest.json` is generated for structured hydration.
+- **`lazy` (default):** Pattern, design-pattern, and anti-pattern markdown files are staged into `.specify/.knowledge-store/` (gitignored). They are **not** placed in the active `.specify/` directories until gate-time routing promotes relevant files. Routing is hybrid: explicit `selected_patterns` blocks remain supported, while plan/task keyword tags from `knowledge-manifest.json` drive default JIT hydration under a ~15,000 token budget per phase.
 - **`eager`:** All pattern files are copied directly into `.specify/patterns/`, `.specify/design-patterns/`, and `.specify/anti-patterns/` during bootstrap. Best for teams that want full local availability without gate-driven hydration.
 
 In both modes, `.specify/pattern-index.md` and `docs/knowledge-base/` workflow docs are always copied.
@@ -340,13 +340,14 @@ python scripts/patch.py --workspace /path/to/project --add-ai kilocode --skip-ad
 `extensions/itx-gates/hooks/orchestrator.py` implements the core validators, while `extensions/itx-gates/hooks/gatectl.py` is the host-friendly wrapper used by the `after_*` commands:
 
 - Tier 1 (auto-correction): writes `.specify/context/gate_feedback.md` and exits `0`
+- Tier 1 auto-retry contract: `gatectl.py ensure` writes `.specify/context/gate-failure-report.md` with `<SYSTEM_CORRECTION>` plus retry metadata (`retry_requested`, attempt counts, remaining budget)
 - Tier 2 (hard halt): writes `.specify/context/gate_feedback.md` and exits `1`
 - machine-readable state: writes `.specify/context/gate-state.yml` and appends `.specify/context/gate-events.jsonl`
 - user-visible summary: refreshes `.specify/context/last-gate-summary.md`
 - `after_plan`: validates mandatory plan sections (Full Plan requires sections `4`, `4b`, `5`, and `13`; Patch Plan and Tool Plan use patch-plan requirements `1` and `2`)
 - `after_plan` / `after_tasks` / `after_review`: refresh `.specify/context/execution-brief.md` (additive, non-blocking)
 - `after_tasks`: requires at least one tasks file in supported locations and emits Tier 1 when a tasks file has bare list items (all task items must use checkbox syntax)
-- `after_implement`: validates E2E test presence/assertions before domain validators
+- `after_implement`: validates E2E test presence/assertions before domain validators (including provider-based SAST for fintech-banking)
 - `after_review`: validates delivery readiness (all tasks completed, no outstanding Tier 2 findings in gate feedback, E2E assertion baseline still met)
 - pre-action audit log: appends `.specify/context/audit-log.md` entries only for high-risk actions (major refactor, package install/remove, high-risk ops/runtime changes)
 

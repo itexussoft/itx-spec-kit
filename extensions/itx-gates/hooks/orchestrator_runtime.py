@@ -71,7 +71,7 @@ def run_generic_checks(
             )
         for plan_file in plan_files:
             findings.extend(_validate_plan_content(plan_file, policy))
-        findings.extend(_sync_lazy_knowledge(config, workspace, policy))
+        findings.extend(_sync_lazy_knowledge(config, workspace, policy, event=event))
 
     if event == "after_tasks":
         task_files = _find_task_files(workspace)
@@ -86,6 +86,7 @@ def run_generic_checks(
             )
         elif task_files:
             findings.extend(_validate_tasks_checkbox_format(task_files))
+        findings.extend(_sync_lazy_knowledge(config, workspace, policy, event=event))
 
     if event == "after_implement":
         if _e2e_required_for_workspace(workspace, policy):
@@ -120,6 +121,7 @@ def run_generic_checks(
 
         if _e2e_required_for_workspace(workspace, policy):
             findings.extend(check_e2e_test_presence(workspace))
+        findings.extend(_sync_lazy_knowledge(config, workspace, policy, event=event))
 
     if config.get("execution_mode") == "docker-fallback":
         container_name = (config.get("docker") or {}).get("container_name")

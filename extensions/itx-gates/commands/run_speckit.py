@@ -41,6 +41,9 @@ from pathlib import Path
 
 import yaml
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "hooks"))
+from core_orchestrator.github_spec_kit import GithubSpecKitOrchestrator
+
 DEFAULT_SPEC_KIT_REF = "v0.5.0"
 
 PROMPT_BEGIN = "---SPECKIT-PROMPT---"
@@ -242,54 +245,18 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     workspace = Path(args.workspace).expanduser().resolve()
 
-    # --- Attempt CLI dispatch first ---
-    cli = _detect_cli(args.cli)
-    cli_exit: int | None = None
-
-    if cli is not None:
-        spec_kit_ref = _load_spec_kit_ref(workspace)
-        canonical = _canonicalize(args.command)
-        if canonical.startswith("speckit.") and cli in {"specify", "uvx"}:
-            if not _specify_can_dispatch_extension_commands():
-                sys.stderr.write(f"[run-speckit] {cli} cannot dispatch extension commands — using local resolution\n")
-                cli = None
-
-    if cli is not None:
-        cmd = _build_command(cli, args.command, workspace, spec_kit_ref)
-
-        sys.stderr.write(f"[run-speckit] Using CLI: {cli}\n")
-        sys.stderr.write(f"[run-speckit] Running: {' '.join(cmd)}\n")
-
-        cwd = str(workspace) if cli in ("specify", "uvx") else None
-        result = subprocess.run(cmd, cwd=cwd)
-        cli_exit = result.returncode
-        if cli_exit == 0:
-            return 0
-
-        sys.stderr.write(f"[run-speckit] CLI exited {cli_exit} — trying local resolution\n")
-
-    # --- Fallback: resolve the extension prompt locally ---
-    prompt_path = _resolve_local(workspace, args.command)
-    if prompt_path is not None:
-        rel = prompt_path.relative_to(workspace)
-        sys.stderr.write(f"[run-speckit] Resolved locally: {rel}\n")
-        content = prompt_path.read_text(encoding="utf-8")
-        sys.stdout.write(f"{PROMPT_BEGIN}\n{content}\n{PROMPT_END}\n")
-        return 0
-
-    # --- Nothing worked ---
-    if cli is None:
-        sys.stderr.write(
-            "[run-speckit] No Spec-Kit CLI found and local resolution failed.\n"
-            "  Install one of: spec-kit, specify (specify-cli), or uvx.\n"
-            "  With uvx:  pip install uv   (or see https://docs.astral.sh/uv/)\n"
-        )
-    else:
-        sys.stderr.write(
-            f"[run-speckit] CLI failed (exit {cli_exit}) and command "
-            f"'{args.command}' not found in local extension registry.\n"
-        )
-    return 1
+    orchestrator = GithubSpecKitOrchestrator(
+        load_spec_kit_ref=_load_spec_kit_ref,
+        canonicalize=_canonicalize,
+        resolve_local=_resolve_local,
+        detect_cli=_detect_cli,
+        can_dispatch=_specify_can_dispatch_extension_commands,
+        build_command=_build_command,
+        prompt_begin=PROMPT_BEGIN,
+        prompt_end=PROMPT_END,
+    )
+    result = orchestrator.run_extension_command(command=args.command, workspace=workspace, cli_override=args.cli)
+    return int(result.get("returncode", 1))
 
 
 if __name__ == "__main__":

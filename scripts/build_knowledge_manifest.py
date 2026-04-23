@@ -17,10 +17,73 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
 import yaml
+
+
+_FRONTMATTER_RE = re.compile(r"\A---\n(.*?)\n---\n?", re.DOTALL)
+
+
+def _split_frontmatter(markdown: str) -> tuple[dict, str]:
+    match = _FRONTMATTER_RE.match(markdown)
+    if not match:
+        return {}, markdown
+    try:
+        parsed = yaml.safe_load(match.group(1)) or {}
+    except yaml.YAMLError:
+        parsed = {}
+    if not isinstance(parsed, dict):
+        parsed = {}
+    return parsed, markdown[match.end() :]
+
+
+def _to_slug_tokens(value: str) -> list[str]:
+    cleaned = re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
+    return [token for token in cleaned.split() if token]
+
+
+def _derive_tags(*, name: str, description: str, category: str, frontmatter: dict) -> list[str]:
+    raw_tags = frontmatter.get("tags")
+    if isinstance(raw_tags, list):
+        tags = [str(tag).strip().lower() for tag in raw_tags if str(tag).strip()]
+        if tags:
+            return sorted(dict.fromkeys(tags))
+
+    tags: list[str] = []
+    tags.extend(_to_slug_tokens(name.replace(".md", "")))
+    tags.extend(_to_slug_tokens(description))
+    tags.append(category)
+    if "event" in tags:
+        tags.extend(["events", "event-driven"])
+    if "api" in tags:
+        tags.extend(["controller", "endpoint"])
+    if "ledger" in tags:
+        tags.extend(["db", "sql", "transaction"])
+    if "frontend" in tags:
+        tags.extend(["ui", "component"])
+    return sorted(dict.fromkeys(tag for tag in tags if tag))
+
+
+def _derive_phases(frontmatter: dict) -> list[str]:
+    raw_phases = frontmatter.get("phases")
+    if isinstance(raw_phases, list):
+        phases = [str(phase).strip() for phase in raw_phases if str(phase).strip()]
+        if phases:
+            return sorted(dict.fromkeys(phases))
+    return ["after_plan", "after_tasks", "after_review"]
+
+
+def _derive_token_estimate(frontmatter: dict, body_text: str) -> int:
+    raw = frontmatter.get("token_estimate")
+    if isinstance(raw, int) and raw > 0:
+        return raw
+    words = len(re.findall(r"\S+", body_text))
+    # Approximate token budget for English prose.
+    estimate = max(80, int(words * 1.35))
+    return estimate
 
 
 def _collect_entries(preset_dir: Path, preset_data: dict) -> list[dict]:
@@ -36,12 +99,25 @@ def _collect_entries(preset_dir: Path, preset_data: dict) -> list[dict]:
             if not file_rel:
                 continue
             source = preset_dir / file_rel
+            markdown = source.read_text(encoding="utf-8", errors="ignore") if source.exists() else ""
+            frontmatter, body = _split_frontmatter(markdown)
+            tags = _derive_tags(
+                name=Path(file_rel).name,
+                description=str(item.get("description", "")).strip(),
+                category=category_name,
+                frontmatter=frontmatter,
+            )
+            phases = _derive_phases(frontmatter)
+            token_estimate = _derive_token_estimate(frontmatter, body)
             entries.append(
                 {
                     "name": Path(file_rel).name,
                     "category": category_name,
                     "source": str(source),
                     "description": str(item.get("description", "")).strip(),
+                    "tags": tags,
+                    "phases": phases,
+                    "token_estimate": token_estimate,
                 }
             )
     return entries
@@ -65,7 +141,7 @@ def build_manifest(kit_root: Path, domain: str) -> dict:
         by_name[entry["name"]] = entry
 
     return {
-        "schema_version": "1.0",
+        "schema_version": "1.1",
         "domain": domain,
         "kit_root": str(kit_root),
         "files": by_name,

@@ -7,7 +7,7 @@ scripts:
 ## Purpose
 
 Ensure the Itexus quality gates orchestrator has executed for the `after_implement` lifecycle
-event. Runs domain-specific validators (trading AST, banking heuristic, healthcare
+event. Runs domain-specific validators (trading AST, banking SAST provider, healthcare
 regex) in addition to the standard checks.
 
 ## When to run
@@ -30,7 +30,8 @@ The wrapper is host-aware:
 
 - Exit `0` and no `.specify/context/gate_feedback.md`: the gate passed cleanly.
 - Exit `0` and `gate_feedback.md` exists: Tier 1 findings were recorded for
-  auto-correction; fix them and rerun `after_implement`.
+  auto-correction. `gatectl.py` also writes `.specify/context/gate-failure-report.md`
+  with a `<SYSTEM_CORRECTION>` block and auto-retry metadata.
 - Exit `1`: Tier 2 findings were recorded; stop and escalate to human review.
 
 ## Artifacts
@@ -39,5 +40,6 @@ The wrapper is host-aware:
 - `.specify/context/gate-state.yml` with the latest machine-readable gate state
 - `.specify/context/gate-events.jsonl` with append-only gate execution events
 - `.specify/context/last-gate-summary.md` with the latest human-readable summary
+- `.specify/context/gate-failure-report.md` for Tier 1 auto-correction loops
 
 See `docs/knowledge-base/workflow-and-gates.md` for the full gate reference.

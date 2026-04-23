@@ -1,0 +1,19 @@
+rules:
+  - id: banking-sql-injection-ledger-query
+    message: "Potential SQL injection in ledger query execution."
+    severity: ERROR
+    languages: [python]
+    patterns:
+      - pattern-either:
+          - pattern: $CURSOR.execute(f"...{$VAR}...")
+          - pattern: $CURSOR.execute("..." + $VAR + "...")
+          - pattern: $ENGINE.execute(f"...{$VAR}...")
+          - pattern: $DB.execute(f"...{$VAR}...")
+      - pattern-regex: "(?i)(ledger|balance|account|transaction)"
+
+  - id: banking-raw-pan-storage
+    message: "Potential raw PAN storage variable detected."
+    severity: WARNING
+    languages: [python, javascript, typescript]
+    pattern-regex: "(?i)\\b(cardpan|raw_card_number|full_pan)\\b"
+

@@ -29,6 +29,25 @@ def write_config(workspace: Path, *, hook_mode: str = "hybrid") -> None:
     )
 
 
+def write_config_with_auto_retry(workspace: Path, *, max_attempts: int, hook_mode: str = "hybrid") -> None:
+    workspace.joinpath(".itx-config.yml").write_text(
+        "\n".join(
+            [
+                'domain: "base"',
+                'execution_mode: "mcp"',
+                f'hook_mode: "{hook_mode}"',
+                "knowledge:",
+                '  mode: "eager"',
+                "gate:",
+                "  auto_retry:",
+                f"    max_attempts: {max_attempts}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
 def write_policy(workspace: Path) -> None:
     policy_src = ROOT / "presets" / "base" / "policy.yml"
     dest = workspace / ".specify" / "policy.yml"
@@ -67,10 +86,12 @@ class ItxGatesRuntimeStateTests(unittest.TestCase):
             cmd.append("--json")
         return subprocess.run(cmd, check=False, capture_output=True, text=True)
 
-    def run_gatectl(self, workspace: Path, event: str, *, json_mode: bool = False) -> subprocess.CompletedProcess[str]:
+    def run_gatectl(self, workspace: Path, event: str, *, json_mode: bool = False, force: bool = False) -> subprocess.CompletedProcess[str]:
         cmd = ["python3", str(GATECTL), "ensure", "--event", event, "--workspace", str(workspace)]
         if json_mode:
             cmd.append("--json")
+        if force:
+            cmd.append("--force")
         return subprocess.run(cmd, check=False, capture_output=True, text=True)
 
     def test_after_plan_json_output_writes_gate_state_and_summary(self):
@@ -151,6 +172,42 @@ class ItxGatesRuntimeStateTests(unittest.TestCase):
             self.assertFalse(payload["fresh_before_run"])
             self.assertEqual(payload["freshness_reason"], "inputs-changed")
             self.assertEqual(payload["status"], "passed")
+
+    def test_gatectl_after_implement_tier1_writes_failure_report_and_retry_payload(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws)
+            write_policy(ws)
+
+            result = self.run_gatectl(ws, "after_implement", json_mode=True, force=True)
+
+            self.assertEqual(result.returncode, 0, msg=result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["status"], "tier1")
+            self.assertTrue(payload["retry_requested"])
+            self.assertEqual(payload["auto_retry_attempt"], 1)
+            report = ws / payload["gate_failure_report_path"]
+            self.assertTrue(report.exists())
+            self.assertIn("<SYSTEM_CORRECTION>", report.read_text(encoding="utf-8"))
+
+    def test_gatectl_after_implement_auto_retry_exhausts_and_requires_human(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config_with_auto_retry(ws, max_attempts=1)
+            write_policy(ws)
+
+            first = self.run_gatectl(ws, "after_implement", json_mode=True, force=True)
+            self.assertEqual(first.returncode, 0, msg=first.stderr)
+            first_payload = json.loads(first.stdout)
+            self.assertTrue(first_payload["retry_requested"])
+            self.assertFalse(first_payload["human_action_required"])
+
+            second = self.run_gatectl(ws, "after_implement", json_mode=True, force=True)
+            self.assertEqual(second.returncode, 0, msg=second.stderr)
+            second_payload = json.loads(second.stdout)
+            self.assertFalse(second_payload["retry_requested"])
+            self.assertTrue(second_payload["human_action_required"])
+            self.assertEqual(second_payload["auto_retry_attempt"], 2)
 
 
 if __name__ == "__main__":

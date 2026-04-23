@@ -11,13 +11,13 @@ Delivery stages:
    - Brownfield intake commands establish workstream metadata (`workstream_id`, `work_class`, `artifact_root`, `branch`, optional `parent_feature`) before `/speckit.plan`.
    - `/speckit.plan` reads `.specify/pattern-index.md`, selects relevant pattern files, and produces the planning artifact mapped to the resolved work class.
    - In lazy knowledge mode, read full candidate pattern content from `.specify/.knowledge-store/` during planning.
-5. **`after_plan` gate** — validates plan presence + mandatory sections; in lazy knowledge mode, materializes only selected pattern files into `.specify/`
+5. **`after_plan` gate** — validates plan presence + mandatory sections; in lazy knowledge mode, materializes JIT-selected files into `.specify/` (explicit `selected_patterns` override plus manifest-tag routing)
 5b. **Execution brief refresh** — after plan/tasks/review checks, the orchestrator updates `.specify/context/execution-brief.md` as a compact agent-facing summary (additive, non-blocking).
 6. Tasks (`/speckit.tasks`) — produces **`tasks.md`** in the active workstream directory using `tasks-template.md` as format reference. Every task **must** use `- [ ]` checkbox syntax.
 7. **`after_tasks` gate** — validates tasks file presence and checkbox format
 8. Analyze (`/speckit.analyze`, optional) — **only after** `tasks.md` exists; cross-artifact check needs the task inventory
 9. Implement (`/speckit.implement`)
-10. **`after_implement` gate** — validates E2E test presence and assertion quality, then runs domain-specific validators
+10. **`after_implement` gate** — validates E2E test presence and assertion quality, then runs domain-specific validators (provider-based SAST for fintech-banking)
 11. Test / Cleanup / Review (extensions + gates)
 12. **`after_review` gate** — validates delivery readiness (all tasks completed, no outstanding Tier 2 feedback, E2E checks still present)
 13. Deliver — prepare done report and open PR for human merge decision
@@ -162,7 +162,7 @@ Gate enforcement rules (mandatory sections, placeholder markers, retry limits) a
 
 | Hook | Fires After | Validates |
 |------|------------|-----------|
-| `after_plan` | `/speckit.plan` | Plan file exists; required sections for the resolved work-class policy are present with non-placeholder content; required traceability mode/id contract is valid. In lazy mode, selected pattern filenames are resolved from the knowledge manifest or local knowledge store. |
+| `after_plan` | `/speckit.plan` | Plan file exists; required sections for the resolved work-class policy are present with non-placeholder content; required traceability mode/id contract is valid. In lazy mode, knowledge is resolved by explicit selection plus task/plan tag routing from the manifest. |
 | `after_tasks` | `/speckit.tasks` | At least one `tasks.md` exists in supported locations (`specs/**`, `.specify/`, or workspace root), and checkbox format is validated. |
 | `after_implement` | `/speckit.implement` | E2E test files exist and include assertions for work classes whose testing expectation is not `advisory`, then domain-specific validators run. Docker preflight connectivity is checked on every gate event when `execution_mode` is `docker-fallback`. |
 | `after_review` | Review completion | All tasks are marked complete, no outstanding Tier 2 findings remain in gate feedback, and E2E assertions are still present. |
@@ -199,6 +199,7 @@ During `after_implement`, the gate enforces baseline E2E testing hygiene for non
 
 - **Tier 1:** non-critical issues are written to `.specify/context/gate_feedback.md` and execution continues.
 - **Tier 2:** critical issues are also written to `gate_feedback.md` and execution stops with a non-zero exit code.
+- `gatectl.py ensure` writes `.specify/context/gate-failure-report.md` for Tier 1 `after_implement` failures and emits retry metadata for host-driven autonomous continuation.
 - Every gate execution also refreshes `gate-state.yml` and `last-gate-summary.md`, so hosts that hide shell output still have a durable result surface.
 - Tier 1 retries are tracked per `event + rule` and escalate to Tier 2 when a specific finding exceeds the retry limit (default: 3, configurable via `gate.max_tier1_retries` in `.itx-config.yml`).
 - Findings can include confidence metadata (`deterministic` or `heuristic`) and remediation ownership for triage.

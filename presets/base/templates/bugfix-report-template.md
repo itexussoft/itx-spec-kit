@@ -52,6 +52,14 @@ _Use only when relevant to this bugfix._
 - Security micro-overlays: include auth/secrets, OWASP, or rate-limiting checks when the defect touches trust boundaries.
 - TDD rule: start with a failing regression/unit test for the reproduced defect before implementing the fix.
 
+## 6c. Gate Auto-Retry Evidence (Optional)
+
+_Use when `after_implement` triggered auto-correction loops._
+
+- Latest report: `.specify/context/gate-failure-report.md`
+- Attempt trail: capture attempt count and resolved rule IDs from the report/audit log
+- Final state: `[resolved in auto-retry | escalated to human review]`
+
 ---
 
 _Template source: `presets/base/templates/bugfix-report-template.md`_
