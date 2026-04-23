@@ -76,6 +76,19 @@ class SastAndContextRouterTests(unittest.TestCase):
         self.assertIn("anti_tags", leakage)
         self.assertIn("branding", leakage["anti_tags"])
 
+        procurement_manifest = build_manifest(ROOT, "procurement-guarantees")
+        flow = procurement_manifest["files"]["configurable-flow-metamodel.md"]
+        self.assertIn("anti_tags", flow)
+        self.assertIn("react", flow["anti_tags"])
+
+        lifecycle = procurement_manifest["files"]["dual-state-machine-application-track.md"]
+        self.assertIn("anti_tags", lifecycle)
+        self.assertIn("table", lifecycle["anti_tags"])
+
+        status_bypass = procurement_manifest["files"]["implicit-status-bypass.md"]
+        self.assertIn("anti_tags", status_bypass)
+        self.assertIn("badge", status_bypass["anti_tags"])
+
     def test_semgrep_provider_maps_sql_injection_to_tier2(self):
         from security_providers import semgrep_provider
 

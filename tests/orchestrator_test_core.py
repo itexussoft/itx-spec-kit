@@ -2544,6 +2544,85 @@ class OrchestratorTests(unittest.TestCase):
             self.assertTrue(feedback.exists())
             self.assertIn("banking-payment-boundary-controls-missing", feedback.read_text(encoding="utf-8"))
 
+    def test_procurement_status_bypass_is_tier2(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "procurement-guarantees")
+            write_e2e_test(ws)
+            ws.joinpath("application_service.py").write_text(
+                "\n".join(
+                    [
+                        "def approve_track(track):",
+                        "    track.track_status = 'APPROVED'",
+                        "    return track",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_implement")
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("procurement-status-transition-bypass", result.stderr)
+
+    def test_procurement_partner_endpoint_missing_protection_is_tier1(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "procurement-guarantees")
+            write_e2e_test(ws)
+            ws.joinpath("broker_gateway.py").write_text(
+                "\n".join(
+                    [
+                        "@router.post('/partner/webhook')",
+                        "def partner_webhook(payload):",
+                        "    return {'ok': True}",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_implement")
+            self.assertEqual(result.returncode, 0)
+            feedback = ws / ".specify" / "context" / "gate_feedback.md"
+            self.assertTrue(feedback.exists())
+            text = feedback.read_text(encoding="utf-8")
+            self.assertIn("procurement-partner-auth-missing", text)
+            self.assertIn("procurement-partner-replay-protection-missing", text)
+
+    def test_procurement_silent_manual_fallback_is_tier2(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "procurement-guarantees")
+            write_e2e_test(ws)
+            ws.joinpath("bank_gateway.py").write_text(
+                "\n".join(
+                    [
+                        "def deliver_via_api(track):",
+                        "    if api_error:",
+                        "        track_mode = 'MANUAL'",
+                        "        fallback = 'manual'",
+                        "    return track",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_implement")
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("procurement-silent-api-manual-fallback", result.stderr)
+
+    def test_procurement_history_delete_is_tier2(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            write_config(ws, "procurement-guarantees")
+            write_e2e_test(ws)
+            ws.joinpath("snapshots.sql").write_text(
+                "DELETE FROM track_field_snapshot WHERE track_id = :track_id\n",
+                encoding="utf-8",
+            )
+            result = self.run_gate(ws, "after_implement")
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("procurement-history-delete", result.stderr)
+
     def test_trading_unparsable_python_reports_tier1(self):
         with tempfile.TemporaryDirectory() as tmp:
             ws = Path(tmp)
@@ -2965,6 +3044,23 @@ class OrchestratorTests(unittest.TestCase):
         module_path = ROOT / "extensions" / "itx-gates" / "hooks" / "validators" / "health_regex.py"
         hooks_path = ROOT / "extensions" / "itx-gates" / "hooks"
         spec = importlib.util.spec_from_file_location("health_validator_module", module_path)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        with mock.patch.object(sys, "path", [str(hooks_path), *sys.path]):
+            spec.loader.exec_module(module)
+
+        fake_path = mock.Mock()
+        fake_path.read_text.side_effect = OSError("permission denied")
+        with mock.patch.object(module, "collect_code_files", return_value=[fake_path]):
+            findings = module.run(Path("."))
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0]["rule"], "validator-file-read-failed")
+
+    def test_procurement_validator_handles_file_read_errors(self):
+        module_path = ROOT / "extensions" / "itx-gates" / "hooks" / "validators" / "procurement_guarantees_heuristic.py"
+        hooks_path = ROOT / "extensions" / "itx-gates" / "hooks"
+        spec = importlib.util.spec_from_file_location("procurement_validator_module", module_path)
         self.assertIsNotNone(spec)
         self.assertIsNotNone(spec.loader)
         module = importlib.util.module_from_spec(spec)

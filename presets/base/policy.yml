@@ -420,6 +420,30 @@ rules:
     severity: tier1
     confidence: heuristic
     remediation_owner: domain-team
+  procurement-status-transition-bypass:
+    severity: tier2
+    confidence: deterministic
+    remediation_owner: domain-team
+  procurement-silent-api-manual-fallback:
+    severity: tier2
+    confidence: heuristic
+    remediation_owner: domain-team
+  procurement-history-delete:
+    severity: tier2
+    confidence: deterministic
+    remediation_owner: domain-team
+  procurement-partner-auth-missing:
+    severity: tier1
+    confidence: heuristic
+    remediation_owner: security-team
+  procurement-partner-replay-protection-missing:
+    severity: tier1
+    confidence: heuristic
+    remediation_owner: security-team
+  procurement-org-scope-marker-missing:
+    severity: tier1
+    confidence: heuristic
+    remediation_owner: domain-team
   completion-tasks-unchecked:
     severity: tier1
     confidence: deterministic

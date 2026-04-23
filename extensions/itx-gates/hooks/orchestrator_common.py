@@ -30,6 +30,7 @@ DOMAIN_VALIDATORS: Dict[str, str] = {
     "fintech-banking": "validators.sast_validator",
     "healthcare": "validators.health_regex",
     "saas-platform": "validators.saas_platform_heuristic",
+    "procurement-guarantees": "validators.procurement_guarantees_heuristic",
 }
 
 # Inline fallback used when policy.yml is not available in the workspace.
@@ -471,6 +472,36 @@ _DEFAULT_POLICY: Dict[str, Any] = {
             "remediation_owner": "domain-team",
         },
         "saas-global-cache-key": {
+            "severity": "tier1",
+            "confidence": "heuristic",
+            "remediation_owner": "domain-team",
+        },
+        "procurement-status-transition-bypass": {
+            "severity": "tier2",
+            "confidence": "deterministic",
+            "remediation_owner": "domain-team",
+        },
+        "procurement-silent-api-manual-fallback": {
+            "severity": "tier2",
+            "confidence": "heuristic",
+            "remediation_owner": "domain-team",
+        },
+        "procurement-history-delete": {
+            "severity": "tier2",
+            "confidence": "deterministic",
+            "remediation_owner": "domain-team",
+        },
+        "procurement-partner-auth-missing": {
+            "severity": "tier1",
+            "confidence": "heuristic",
+            "remediation_owner": "security-team",
+        },
+        "procurement-partner-replay-protection-missing": {
+            "severity": "tier1",
+            "confidence": "heuristic",
+            "remediation_owner": "security-team",
+        },
+        "procurement-org-scope-marker-missing": {
             "severity": "tier1",
             "confidence": "heuristic",
             "remediation_owner": "domain-team",

@@ -29,7 +29,7 @@ from itx_specify import (
     validate_init_agent,
 )
 
-ALLOWED_DOMAINS = {"base", "fintech-trading", "fintech-banking", "healthcare", "saas-platform"}
+ALLOWED_DOMAINS = {"base", "fintech-trading", "fintech-banking", "healthcare", "saas-platform", "procurement-guarantees"}
 ALLOWED_KNOWLEDGE_MODES = {"lazy", "eager"}
 ALLOWED_EXECUTION_MODES = {"mcp", "docker-fallback"}
 ALLOWED_HOOK_MODES = {"auto", "manual", "hybrid"}

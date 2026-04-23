@@ -330,6 +330,10 @@ class ItxInitTests(unittest.TestCase):
             self.assertIn("# Base", text)
             self.assertIn("# Healthcare", text)
 
+    def test_procurement_guarantees_is_valid_domain(self):
+        args = _valid_args(domain="procurement-guarantees")
+        itx_init.ensure_valid_args(args)
+
     def test_detect_spec_cli_priority(self):
         with mock.patch("itx_init.shutil.which") as which:
             which.side_effect = lambda name: "/usr/bin/specify" if name == "specify" else None
