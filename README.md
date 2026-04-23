@@ -8,7 +8,7 @@ It combines:
 - local extensions for brownfield workflows and quality gates
 - bootstrap and patch scripts that materialize everything into a downstream workspace
 
-Current kit version: `0.3.0` from [catalog/index.json](/Users/sprivalov/itexus/src/itx-spec-kit/catalog/index.json).
+Current kit version: `0.4.0` from [catalog/index.json](/Users/sprivalov/itexus/src/itx-spec-kit/catalog/index.json).
 
 **What It Gives You**
 
