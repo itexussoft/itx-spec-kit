@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Sequence, cast
 
+from architecture_runner import run as run_architecture_checks
 from orchestrator_brief import _generate_execution_brief, _sync_lazy_knowledge
 from orchestrator_common import (
     DOMAIN_VALIDATORS,
@@ -243,6 +244,18 @@ def main() -> int:
     hook_mode = str(config.get("hook_mode", "hybrid")).strip() or "hybrid"
     findings: List[Finding] = []
     findings.extend(run_generic_checks(config, event, workspace, policy))
+    try:
+        findings.extend(run_architecture_checks(event=event, workspace=workspace, policy=policy))
+    except Exception as exc:  # noqa: BLE001
+        findings.append(
+            {
+                "severity": TIER_1,
+                "rule": "architecture-runner-crashed",
+                "message": f"Architecture runner crashed: {exc}",
+                "confidence": "heuristic",
+                "remediation_owner": "feature-team",
+            }
+        )
     if event == "after_implement":
         findings.extend(run_domain_checks(domain, workspace, rule_defaults=rule_defaults))
     findings = validate_findings(findings, rule_defaults=rule_defaults)

@@ -227,6 +227,21 @@ _DEFAULT_POLICY: Dict[str, Any] = {
     "placeholder_markers": ["_e.g.,", "e.g.,", "MANDATORY"],
     "gate": {"default_max_tier1_retries": 3, "heuristic_retry_escalates": False, "auto_retry": {"max_attempts": 3}},
     "quality": {
+        "architecture": {
+            "enabled": False,
+            "mode": "advisory",
+            "runner": "auto",
+            "command": None,
+            "parse": None,
+            "events": ["after_implement"],
+            "baseline_file": ".specify/context/architecture-baseline.json",
+            "fail_on_unmapped_violation": False,
+            "exit_code_signals": "report",
+            "timeout_s": 120,
+            "spectral": {"files": []},
+            "archunit": {"command": None, "reports_glob": "target/surefire-reports/TEST-*.xml"},
+            "modulith": {"command": None, "report_file": None},
+        },
         "security": {
             "enabled": False,
             "provider": "noop",
@@ -352,6 +367,36 @@ _DEFAULT_POLICY: Dict[str, Any] = {
             "severity": "tier1",
             "confidence": "heuristic",
             "remediation_owner": "security-team",
+        },
+        "architecture-config-missing": {
+            "severity": "tier1",
+            "confidence": "heuristic",
+            "remediation_owner": "feature-team",
+        },
+        "architecture-runner-error": {
+            "severity": "tier1",
+            "confidence": "heuristic",
+            "remediation_owner": "feature-team",
+        },
+        "architecture-runner-crashed": {
+            "severity": "tier1",
+            "confidence": "heuristic",
+            "remediation_owner": "feature-team",
+        },
+        "architecture-report-parse-failed": {
+            "severity": "tier1",
+            "confidence": "heuristic",
+            "remediation_owner": "feature-team",
+        },
+        "architecture-command-failed": {
+            "severity": "tier1",
+            "confidence": "heuristic",
+            "remediation_owner": "feature-team",
+        },
+        "architecture-unmapped-rule": {
+            "severity": "tier2",
+            "confidence": "deterministic",
+            "remediation_owner": "feature-team",
         },
         "healthcare-phi-logging": {
             "severity": "tier1",
@@ -551,6 +596,8 @@ def _gate_generic_input_files(workspace: Path) -> List[Path]:
         workspace / ".itx-config.yml",
         workspace / ".specify" / "policy.yml",
         workspace / ".specify" / "context" / "workflow-state.yml",
+        workspace / ".specify" / "context" / "architecture-baseline.json",
+        workspace / ".specify" / "context" / "mutation-baseline.json",
     ]
     return [path for path in files if path.exists()]
 
@@ -585,6 +632,15 @@ def resolve_gate_output_files(workspace: Path, event: str) -> List[Path]:
     audit = audit_log_path(workspace)
     if audit.exists():
         paths.append(audit)
+    architecture_report = ensure_context_dir(workspace) / "architecture-report.json"
+    if architecture_report.exists():
+        paths.append(architecture_report)
+    mutation_report = ensure_context_dir(workspace) / "mutation-report.json"
+    if mutation_report.exists():
+        paths.append(mutation_report)
+    mutation_summary = ensure_context_dir(workspace) / "mutation-summary.md"
+    if mutation_summary.exists():
+        paths.append(mutation_summary)
     return _dedupe_paths(paths)
 
 
@@ -844,6 +900,12 @@ RULE_REMEDIATION_HINTS: Dict[str, str] = {
     "sast-ruleset-missing": "Restore the configured SAST ruleset path or configure a valid ruleset location.",
     "sast-provider-unknown": "Set quality.security.provider to one of: semgrep, bandit, noop.",
     "sast-provider-fallback-active": "Install/fix Semgrep to remove compatibility fallback and rely on deterministic SAST output.",
+    "architecture-config-missing": "Configure quality.architecture.runner and tool-specific settings in .specify/policy.yml.",
+    "architecture-runner-error": "Verify adapter command/report settings and confirm the selected architecture tool is available.",
+    "architecture-runner-crashed": "Inspect adapter configuration and parser compatibility for the selected architecture runner.",
+    "architecture-report-parse-failed": "Adjust architecture.parse settings or output format so results can be parsed deterministically.",
+    "architecture-command-failed": "Inspect architecture tool stderr and command configuration before rerunning gates.",
+    "architecture-unmapped-rule": "Add a deterministic rule-to-pattern mapping entry for this architecture rule.",
     "saas-tenant-filter-missing": "Add tenant_id filters or RLS session variables for all tenant-scoped queries.",
     "saas-global-cache-key": "Namespace cache keys with tenant id (e.g. t:{tenant_id}:...) to prevent cross-tenant leakage.",
 }
@@ -854,6 +916,12 @@ RULE_DEFAULT_META: Dict[str, Dict[str, str]] = {
     "plan-section-missing": {"confidence": "deterministic", "remediation_owner": "feature-team"},
     "banking-sql-injection-ledger-query": {"confidence": "deterministic", "remediation_owner": "security-team"},
     "sast-provider-unavailable": {"confidence": "heuristic", "remediation_owner": "security-team"},
+    "architecture-config-missing": {"confidence": "heuristic", "remediation_owner": "feature-team"},
+    "architecture-runner-error": {"confidence": "heuristic", "remediation_owner": "feature-team"},
+    "architecture-runner-crashed": {"confidence": "heuristic", "remediation_owner": "feature-team"},
+    "architecture-report-parse-failed": {"confidence": "heuristic", "remediation_owner": "feature-team"},
+    "architecture-command-failed": {"confidence": "heuristic", "remediation_owner": "feature-team"},
+    "architecture-unmapped-rule": {"confidence": "deterministic", "remediation_owner": "feature-team"},
 }
 
 

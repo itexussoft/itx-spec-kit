@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import subprocess
@@ -27,6 +28,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     ensure.add_argument("--workspace", required=True, help="Target workspace root")
     ensure.add_argument("--json", action="store_true", help="Emit machine-readable JSON result")
     ensure.add_argument("--force", action="store_true", help="Force rerun even when a fresh gate state exists")
+
+    baseline = subparsers.add_parser("baseline-update", help="Freeze current report fingerprints into a baseline")
+    baseline.add_argument("--workspace", required=True, help="Target workspace root")
+    baseline.add_argument("--kind", required=True, choices=["architecture", "mutation"], help="Baseline kind to update")
+    baseline.add_argument("--json", action="store_true", help="Emit machine-readable JSON result")
 
     return parser.parse_args(argv)
 
@@ -222,6 +228,124 @@ def _status_from_result(workspace: Path, result: subprocess.CompletedProcess[str
     return str(state.get("status", "")).strip()
 
 
+def _fingerprint_from_result(rule_id: str, file_path: str, line: str, message: str) -> str:
+    raw = "::".join([rule_id.strip().lower(), file_path.strip().lower(), line.strip(), message.strip().lower()])
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _resolve_baseline_file(workspace: Path, kind: str) -> Path:
+    policy = load_policy(workspace)
+    quality = policy.get("quality") if isinstance(policy.get("quality"), dict) else {}
+    kind_cfg = quality.get("architecture" if kind == "architecture" else "mutation_testing")
+    if isinstance(kind_cfg, dict):
+        configured = kind_cfg.get("baseline_file")
+        if isinstance(configured, str) and configured.strip():
+            path = Path(configured.strip())
+            return path if path.is_absolute() else workspace / path
+    suffix = "architecture-baseline.json" if kind == "architecture" else "mutation-baseline.json"
+    return workspace / ".specify" / "context" / suffix
+
+
+def _collect_architecture_fingerprints(report_payload: dict) -> list[str]:
+    runs = report_payload.get("runs")
+    if not isinstance(runs, list):
+        return []
+    fingerprints: list[str] = []
+    for run in runs:
+        if not isinstance(run, dict):
+            continue
+        results = run.get("results")
+        if not isinstance(results, list):
+            continue
+        for result in results:
+            if not isinstance(result, dict):
+                continue
+            props = result.get("properties") if isinstance(result.get("properties"), dict) else {}
+            fp = props.get("fingerprint")
+            if isinstance(fp, str) and fp.strip():
+                fingerprints.append(fp.strip())
+                continue
+            rule_id = str(result.get("ruleId", "")).strip()
+            message = ""
+            msg_obj = result.get("message")
+            if isinstance(msg_obj, dict):
+                message = str(msg_obj.get("text", "")).strip()
+            file_path = ""
+            line = ""
+            locations = result.get("locations")
+            if isinstance(locations, list) and locations:
+                first = locations[0] if isinstance(locations[0], dict) else {}
+                physical = first.get("physicalLocation") if isinstance(first, dict) else {}
+                artifact = physical.get("artifactLocation") if isinstance(physical, dict) else {}
+                if isinstance(artifact, dict):
+                    file_path = str(artifact.get("uri", "")).strip()
+                region = physical.get("region") if isinstance(physical, dict) else {}
+                if isinstance(region, dict):
+                    raw_line = region.get("startLine")
+                    if isinstance(raw_line, int):
+                        line = str(raw_line)
+            fingerprints.append(_fingerprint_from_result(rule_id, file_path, line, message))
+    return sorted(set(fingerprints))
+
+
+def update_baseline(*, kind: str, workspace: Path, json_mode: bool) -> int:
+    context = workspace / ".specify" / "context"
+    report_name = "architecture-report.json" if kind == "architecture" else "mutation-report.json"
+    report_path = context / report_name
+    if not report_path.exists():
+        payload = {"kind": kind, "status": "missing-report", "report_path": str(report_path.relative_to(workspace))}
+        if json_mode:
+            sys.stdout.write(json.dumps(payload, indent=2) + "\n")
+        else:
+            sys.stderr.write(f"[itx-gates] Missing report for baseline update: {report_path}\n")
+        return 1
+
+    try:
+        report_payload = json.loads(report_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        payload = {"kind": kind, "status": "invalid-report", "error": str(exc), "report_path": str(report_path.relative_to(workspace))}
+        if json_mode:
+            sys.stdout.write(json.dumps(payload, indent=2) + "\n")
+        else:
+            sys.stderr.write(f"[itx-gates] Invalid baseline report '{report_path}': {exc}\n")
+        return 1
+
+    if kind == "architecture":
+        fingerprints = _collect_architecture_fingerprints(report_payload if isinstance(report_payload, dict) else {})
+    else:
+        payload = {"kind": kind, "status": "unsupported", "message": "Mutation baseline update will be enabled with Wave G report format."}
+        if json_mode:
+            sys.stdout.write(json.dumps(payload, indent=2) + "\n")
+        else:
+            sys.stderr.write("[itx-gates] Mutation baseline update is not available yet.\n")
+        return 1
+
+    baseline_path = _resolve_baseline_file(workspace, kind)
+    baseline_path.parent.mkdir(parents=True, exist_ok=True)
+    baseline_payload = {
+        "schema_version": "1.0",
+        "kind": kind,
+        "generated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+        "report_path": str(report_path.relative_to(workspace)),
+        "fingerprints": fingerprints,
+    }
+    baseline_path.write_text(json.dumps(baseline_payload, indent=2) + "\n", encoding="utf-8")
+
+    response = {
+        "kind": kind,
+        "status": "updated",
+        "baseline_path": str(baseline_path.relative_to(workspace)),
+        "fingerprint_count": len(fingerprints),
+    }
+    if json_mode:
+        sys.stdout.write(json.dumps(response, indent=2) + "\n")
+    else:
+        sys.stdout.write(
+            f"[itx-gates] Updated {kind} baseline at {response['baseline_path']} with {response['fingerprint_count']} fingerprint(s).\n"
+        )
+    return 0
+
+
 def ensure_gate(event: str, workspace: Path, *, json_mode: bool, force: bool) -> int:
     config = load_config(workspace)
     policy = load_policy(workspace)
@@ -327,6 +451,8 @@ def main(argv: list[str] | None = None) -> int:
     workspace = Path(args.workspace).resolve()
     if args.command == "ensure":
         return ensure_gate(args.event.strip(), workspace, json_mode=args.json, force=args.force)
+    if args.command == "baseline-update":
+        return update_baseline(kind=args.kind.strip().lower(), workspace=workspace, json_mode=args.json)
     return 2
 
 

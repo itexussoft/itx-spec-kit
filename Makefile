@@ -26,6 +26,17 @@ compile:
 		extensions/itx-gates/hooks/security_providers/semgrep_provider.py \
 		extensions/itx-gates/hooks/security_providers/bandit_provider.py \
 		extensions/itx-gates/hooks/security_providers/noop_provider.py \
+		extensions/itx-gates/hooks/architecture_runner.py \
+		extensions/itx-gates/hooks/rule_to_pattern_mapper.py \
+		extensions/itx-gates/hooks/architecture_adapters/__init__.py \
+		extensions/itx-gates/hooks/architecture_adapters/generic_command_adapter.py \
+		extensions/itx-gates/hooks/architecture_adapters/spectral_adapter.py \
+		extensions/itx-gates/hooks/architecture_adapters/archunit_adapter.py \
+		extensions/itx-gates/hooks/architecture_adapters/modulith_adapter.py \
+		extensions/itx-gates/hooks/architecture_parsers/__init__.py \
+		extensions/itx-gates/hooks/architecture_parsers/sarif.py \
+		extensions/itx-gates/hooks/architecture_parsers/junit_xml.py \
+		extensions/itx-gates/hooks/architecture_parsers/jsonpath.py \
 		extensions/itx-gates/hooks/validators/__init__.py \
 		extensions/itx-gates/hooks/validators/trading_ast.py \
 		extensions/itx-gates/hooks/validators/banking_heuristic.py \
@@ -46,6 +57,7 @@ compile:
 		tests/test_validate_catalog.py \
 		tests/test_itx_init.py \
 		tests/test_patch.py \
+		tests/test_architecture_wave_f.py \
 		tests/test_saas_validator.py \
 		tests/test_sast_and_context_router.py \
 		tests/test_itx_gates_runtime_state.py

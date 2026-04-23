@@ -198,6 +198,25 @@ gate:
     max_attempts: 3
 
 quality:
+  architecture:
+    enabled: false
+    mode: advisory
+    runner: auto
+    command: null
+    parse: null
+    events: [after_implement]
+    baseline_file: .specify/context/architecture-baseline.json
+    fail_on_unmapped_violation: false
+    exit_code_signals: report
+    timeout_s: 120
+    spectral:
+      files: []
+    archunit:
+      command: null
+      reports_glob: target/surefire-reports/TEST-*.xml
+    modulith:
+      command: null
+      report_file: null
   security:
     enabled: false
     provider: noop
@@ -299,6 +318,30 @@ rules:
     severity: tier1
     confidence: heuristic
     remediation_owner: security-team
+  architecture-config-missing:
+    severity: tier1
+    confidence: heuristic
+    remediation_owner: feature-team
+  architecture-runner-error:
+    severity: tier1
+    confidence: heuristic
+    remediation_owner: feature-team
+  architecture-runner-crashed:
+    severity: tier1
+    confidence: heuristic
+    remediation_owner: feature-team
+  architecture-report-parse-failed:
+    severity: tier1
+    confidence: heuristic
+    remediation_owner: feature-team
+  architecture-command-failed:
+    severity: tier1
+    confidence: heuristic
+    remediation_owner: feature-team
+  architecture-unmapped-rule:
+    severity: tier2
+    confidence: deterministic
+    remediation_owner: feature-team
   healthcare-phi-logging:
     severity: tier1
     confidence: heuristic

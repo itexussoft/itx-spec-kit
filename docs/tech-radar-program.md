@@ -40,12 +40,16 @@ The program targets four Radar entries:
 | Tier system                  | `tier1` retryable / `tier2` blocking (ADR 0002)                | `advisory -> tier1 heuristic`; `strict -> tier2 deterministic`    |
 | Persistence                  | `write_gate_state` / `append_gate_event` / summary / feedback  | Reuse unchanged; add new side-artifacts only                      |
 | Policy                       | `presets/base/policy.yml`                                      | New `quality.architecture.*`, `quality.mutation_testing.*` blocks |
+| Workspace bootstrap          | `scripts/itx_init.py`                                          | Stage new `.specify/**` assets into booted workspaces             |
+| Workspace patch              | `scripts/patch.py`                                             | Keep existing workspaces aligned with newly shipped assets         |
 | Harness convention           | `harnesses/docker-fallbacks/` (compose file only)              | `harnesses/temporal-fakes/` follows same thin scaffold style      |
 | Execution-brief enrichment   | `_generate_execution_brief` in `orchestrator_brief.py`         | Wave H1 smell guidance appends a small section                    |
-| Build check                  | `make compile` file list in `Makefile`                         | Every new `.py` file must be appended there                       |
+| Build check                  | `Makefile` + `scripts/tasks.ps1` compile file lists            | Every new `.py` file must be appended in both places              |
 
 `.github/workflows/` is empty. The triplet `make test && make compile && make validate-catalog`
 is the only automated safety net during the program.
+`.specify/` is created in downstream workspaces during `specify init`; this repo must stage all
+new workspace-facing artifacts into that folder via `itx-init` and `patch.py`.
 
 ## 3. Design decisions (research-informed)
 
@@ -90,7 +94,7 @@ parse:
     message: "comment"
 ```
 
-No external `jq` dependency — use `jsonpath-ng` (pure Python) or a small internal resolver.
+No external `jq` dependency and no new runtime dependency — use a small internal resolver.
 
 ### 3.3 Exit-code contract
 
@@ -123,8 +127,9 @@ No new severity level. No new retry class.
 
 - Shipped defaults in `presets/base/policy.yml` with `enabled: false`. Existing workspaces
   unaffected.
-- Workspace overrides in `.specify/config.yml` under the same `quality.*` namespace. (Final
-  filename confirmation is the one open decision — see §10.)
+- Workspace policy overrides remain in `.specify/policy.yml` under the same `quality.*`
+  namespace.
+- Runtime/host-level overrides remain in `.itx-config.yml` where needed.
 - Verticals (`fintech-trading`, `fintech-banking`, `healthcare`, `saas-platform`) stay silent.
 
 ### 3.7 LLM-driven remediation is out-of-scope for this program
@@ -140,6 +145,16 @@ Research surfaced iSMELL (ASE 2024) as the closest reference architecture for de
 
 Honors authoritative-plan non-negotiable #6 ("no mandatory new runtime dependency on LLM judgment
 for correctness").
+
+### 3.8 Bootstrap and patch propagation contract
+
+- `.specify/` is a bootstrapped workspace surface, not a repository root surface.
+- Every new workspace-facing artifact introduced by this program must be staged by
+  `scripts/itx_init.py`.
+- The same artifact must be propagated by `scripts/patch.py` for already-booted workspaces,
+  preserving existing safe-update semantics.
+- Any new `.specify` artifact that must survive `--retarget-ai` must be included in the retarget
+  preserve list.
 
 ## 4. Wave F — Architecture Assurance Adapters
 
@@ -178,10 +193,12 @@ Edits:
 
 - `orchestrator_runtime.py` — call `architecture_runner.run(...)` in the `after_implement` (and
   conditionally `after_plan`) branch; merge findings into the existing tier pipeline.
-- `orchestrator_common.py` — extend policy loader to honor `quality.architecture` and workspace
-  config overlay.
+- `orchestrator_common.py` — extend policy handling to honor `quality.architecture` in
+  `.specify/policy.yml`.
 - `presets/base/policy.yml` — add `quality.architecture.*` block (disabled by default).
-- `Makefile` — add new `.py` files to `compile` target.
+- `scripts/itx_init.py` — stage any new workspace-facing architecture assets.
+- `scripts/patch.py` — propagate architecture assets to existing workspaces.
+- `Makefile` and `scripts/tasks.ps1` — add new `.py` files to compile targets.
 
 ### 4.4 Rule-to-pattern mapper seed content (~20 entries)
 
@@ -286,7 +303,9 @@ Edits:
 
 - `orchestrator_runtime.py` — call `mutation_runner.run(...)` only in `after_implement`.
 - `presets/base/policy.yml` — add `quality.mutation_testing.*` block.
-- `Makefile` — register new files.
+- `scripts/itx_init.py` — stage any new workspace-facing mutation assets.
+- `scripts/patch.py` — propagate mutation assets to existing workspaces.
+- `Makefile` and `scripts/tasks.ps1` — register new Python files.
 
 ### 5.4 Policy block
 
@@ -389,7 +408,10 @@ Edits:
 - `orchestrator_brief.py._generate_execution_brief` — add a "Smell guidance" section, rendered
   only when smell-tagged findings exist.
 - `scripts/validate_catalog.py` — validate `smell-catalog.yml` against a JSON Schema.
-- `Makefile` — register new files.
+- `scripts/itx_init.py` — stage `smell-catalog.yml` into downstream `.specify/` if required for
+  runtime guidance.
+- `scripts/patch.py` — propagate smell assets to existing workspaces with safe-update semantics.
+- `Makefile` and `scripts/tasks.ps1` — register new Python files.
 
 ### 6.3 Catalog schema (`presets/base/smell-catalog.yml`)
 
@@ -604,16 +626,18 @@ Codifies 8 failure modes:
 
 One branch `itx-tech-radar-program`, seven commits:
 
-1. Wave F runtime + adapters + rule-to-pattern mapper + policy + tests.
+1. Wave F runtime + adapters + rule-to-pattern mapper + policy + bootstrap/patch propagation +
+   tests.
 2. Wave F docs (`polyglot_adapters.md`, ArchUnit helper example, sample config).
-3. Wave G runtime + adapters (including `python_adapter.py`) + policy + tests.
+3. Wave G runtime + adapters (including `python_adapter.py`) + policy + bootstrap/patch
+   propagation + tests.
 4. Wave G docs + remediation vocabulary reference + sample config.
-5. Wave H1 `smell_mapping.py` + `smell-catalog.yml` + schema validation + tests + brief
-   integration.
+5. Wave H1 `smell_mapping.py` + `smell-catalog.yml` + schema validation + bootstrap/patch
+   propagation + tests + brief integration.
 6. Wave H2 harness scaffold (README, example fake, scenarios, process-compose manifest, schema,
    `mcp-adapter.md`, `ANTIPATTERNS.md`).
-7. Final integration cleanup (Makefile compile list, release-script touch if new py files,
-   documentation index updates). Only if narrow.
+7. Final integration cleanup (`Makefile` + `scripts/tasks.ps1` compile lists, release-script
+   touch if new py files, documentation index updates). Only if narrow.
 
 Validation triplet after every wave:
 
@@ -634,17 +658,11 @@ On any red: stop, fix the current wave, re-run the triplet, continue only after 
 4. New artifacts may be added; old consumers must not break when they are absent.
 5. New capability defaults are non-breaking and opt-in.
 
-## 10. Open decision
+## 10. Configuration decision (resolved)
 
-Workspace-overlay file location. Options:
-
-- `.specify/config.yml` (recommended — matches the existing `.specify/context/` layout).
-- `.specify/quality.yml` (narrower scope, but forks configuration across multiple files).
-- Merge into an existing file (not recommended — no clear host file today).
-
-### Resolution to the Open Decision
-*   **The Verdict:** Go with **`.specify/config.yml`**. 
-*   **Reasoning:** Introducing `.specify/quality.yml` fragments the developer configuration. Centralizing settings in `.specify/config.yml` creates a single source of truth for the workspace override, mapping cleanly to the `quality.*` namespace defined in your policy blocks.
+Workspace-level quality configuration stays in `.specify/policy.yml`; this matches current repo
+bootstrap and patch behavior, avoids control-plane fragmentation, and preserves compatibility with
+existing tests and docs that treat policy as the single workspace configuration surface.
 
 ## 11. Risks (research-informed)
 
@@ -659,12 +677,14 @@ Workspace-overlay file location. Options:
 6. **Over-fidelity / simulator creep** in Wave H2. `ANTIPATTERNS.md` guards by text; consider a
    CODEOWNERS note on `harnesses/temporal-fakes/` to slow drift.
 7. **SARIF version skew.** Pin 2.1.0 in the generic parser; reject 2.0 at ingest.
-8. **Makefile compile drift.** Every new `.py` must be added to `compile`. Add a test that globs
-   `extensions/itx-gates/hooks/**/*.py` and diffs against the Makefile list.
+8. **Compile manifest drift.** Every new `.py` must be added to both compile lists (`Makefile` and
+   `scripts/tasks.ps1`). Add a test that compares runtime hook files against both lists.
 9. **LLM hallucination of patterns.** Mitigated by the deterministic mapper + finite catalog; the
    LLM never authors findings.
 10. **Equivalent mutant noise.** `.specify/mutation-ignore.yml` + `flaky_reruns` mitigate;
     accept <10% residual noise (Code Defenders data).
+11. **Bootstrap drift for workspace assets.** New `.specify` artifacts can be shipped in-repo but
+    absent in booted projects unless both `itx-init` and `patch.py` are updated in the same wave.
 
 ## 12. Out of scope
 
@@ -703,16 +723,19 @@ The program is complete when:
 ```
 Step 1.  git checkout -b itx-tech-radar-program
 Step 2.  Implement Wave F only.
-Step 3.  make test && make compile && make validate-catalog
-Step 4.  Green -> commit Wave F. Not green -> fix and re-run.
-Step 5.  Implement Wave G only.
-Step 6.  make test && make compile && make validate-catalog
-Step 7.  Green -> commit Wave G.
-Step 8.  Implement Wave H only.
-Step 9.  make test && make compile && make validate-catalog
-Step 10. Green -> commit Wave H.
-Step 11. Final integration cleanup only if narrow.
-Step 12. Run the validation triplet one final time.
+Step 3.  Ensure Wave F workspace assets are propagated via `itx-init` + `patch.py`.
+Step 4.  make test && make compile && make validate-catalog
+Step 5.  Green -> commit Wave F. Not green -> fix and re-run.
+Step 6.  Implement Wave G only.
+Step 7.  Ensure Wave G workspace assets are propagated via `itx-init` + `patch.py`.
+Step 8.  make test && make compile && make validate-catalog
+Step 9.  Green -> commit Wave G.
+Step 10. Implement Wave H only.
+Step 11. Ensure Wave H workspace assets are propagated via `itx-init` + `patch.py`.
+Step 12. make test && make compile && make validate-catalog
+Step 13. Green -> commit Wave H.
+Step 14. Final integration cleanup only if narrow.
+Step 15. Run the validation triplet one final time.
 ```
 
 ## 15. References
