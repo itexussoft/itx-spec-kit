@@ -2,7 +2,15 @@
 
 Itexus accelerator for spec-driven AI delivery on top of `github/spec-kit`.
 
-**Kit version** is declared in [`catalog/index.json`](catalog/index.json) as `kit.version` (currently **0.2.2**).
+**Kit version** is declared in [`catalog/index.json`](catalog/index.json) as `kit.version` (currently **0.3.0**).
+
+## What changed in 0.3.0
+
+- **Wave E2 framing:** docs now explain the current architecture as an upstream-aligned `spec-kit` preset-plus-extension model instead of a parallel command ecosystem.
+- **Migration guidance:** added `docs/migration-guide.md` and staged `docs/knowledge-base/migration-guide.md` so existing workspaces patched forward get an actionable old-to-new mapping.
+- **Responsibility model:** README, knowledge-base docs, and extension manifests now consistently distinguish upstream core commands, brownfield intake extension commands, `itx-gates` hook execution, and community review/cleanup via `run_speckit.py`.
+- **Gate runtime clarity:** host-facing guidance now explicitly points to `gatectl.py`, keeps `orchestrator.py` as the validator runtime, and documents `hook_mode`, `gate-state.yml`, `gate-events.jsonl`, and `last-gate-summary.md`.
+- **Preset surface:** the base preset manifest now advertises the shipped `refactor-plan`, `bugfix-report`, and `execution-brief` templates.
 
 ## What changed in 0.2.2
 
@@ -507,6 +515,7 @@ Current focus:
 
 Already shipped baseline:
 
+- **0.3.0** — Wave E2 docs/migration/productization alignment, staged migration guide, clearer gate/runtime ownership model, base preset template surface advertised in manifests
 - **0.2.2** — default **spec-kit `v0.5.0`**, `--ignore-agent-tools` on init, community extension alias sanitization for specify-cli 0.5+, `speckit_version >=0.5.0` on kit artifacts
 - **0.2.1** — `asynchronous-event-loop-architecture.md` pattern for asyncio integration daemons; Tool Plan constitution alignment
 - **0.2.0** — governance YAML in `.specify/`, `after_review` gate, `delivery-mechanics.md`, `done-report-template.md`, init/patch staging for autonomy contracts

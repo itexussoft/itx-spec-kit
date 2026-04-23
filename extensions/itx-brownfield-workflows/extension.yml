@@ -3,7 +3,7 @@ schema_version: "1.0"
 extension:
   id: "itx-brownfield-workflows"
   name: "itexus-spec-kit brownfield workflows"
-  version: 0.2.2
+  version: 0.3.0
   description: "Extension-provided brownfield intake commands that establish workstream metadata and hand off to /speckit.plan"
   author: "itexus"
   repository: "https://github.com/sprivalov/itexus-spec-kit"

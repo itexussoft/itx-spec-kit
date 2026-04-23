@@ -2,7 +2,7 @@
   "schema_version": "1.0",
   "kit": {
     "name": "itexus-spec-kit",
-    "version": "0.2.2"
+    "version": "0.3.0"
   },
   "artifacts": {
     "presets": [

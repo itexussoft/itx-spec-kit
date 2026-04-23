@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bump kit version across catalog and artifact descriptors."""
+"""Bump kit version across catalog, descriptors, and package metadata."""
 
 from __future__ import annotations
 
@@ -36,6 +36,15 @@ def update_nested_yaml_version(path: Path, root_key: str, version: str) -> None:
     path.write_text(updated, encoding="utf-8")
 
 
+def update_pyproject_version(path: Path, version: str) -> None:
+    text = path.read_text(encoding="utf-8")
+    pattern = re.compile(r'(^version\s*=\s*")([^"\n]+)(")', re.MULTILINE)
+    if not pattern.search(text):
+        raise ValueError(f"Missing top-level project version in {path}")
+    updated = pattern.sub(rf'\g<1>{version}\g<3>', text, count=1)
+    path.write_text(updated, encoding="utf-8")
+
+
 def main() -> int:
     args = parse_args()
     validate_version(args.version)
@@ -57,6 +66,10 @@ def main() -> int:
         extension_yaml = artifact_root / "extension.yml"
         if extension_yaml.exists():
             update_nested_yaml_version(extension_yaml, "extension", args.version)
+
+    pyproject_path = root / "pyproject.toml"
+    if pyproject_path.exists():
+        update_pyproject_version(pyproject_path, args.version)
 
     print(f"Bumped kit/artifact versions to {args.version}")
 

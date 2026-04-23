@@ -16,6 +16,10 @@ class ReleaseScriptTests(unittest.TestCase):
             (ws / "presets" / "base").mkdir(parents=True, exist_ok=True)
             (ws / "extensions" / "itx-gates").mkdir(parents=True, exist_ok=True)
             (ws / "scripts").mkdir(parents=True, exist_ok=True)
+            (ws / "pyproject.toml").write_text(
+                '[project]\nname = "itexus-spec-kit"\nversion = "0.1.0"\n',
+                encoding="utf-8",
+            )
 
             (ws / "catalog" / "index.json").write_text(
                 json.dumps(
@@ -58,6 +62,7 @@ class ReleaseScriptTests(unittest.TestCase):
                 "version: 0.2.0",
                 (ws / "extensions" / "itx-gates" / "extension.yml").read_text(encoding="utf-8"),
             )
+            self.assertIn('version = "0.2.0"', (ws / "pyproject.toml").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
