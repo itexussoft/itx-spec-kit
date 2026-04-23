@@ -175,6 +175,7 @@ def stage_docs_and_policy(kit_root: Path, workspace: Path, domain: str) -> None:
         "decision-authority.yml",
         "input-contracts.yml",
         "notification-events.yml",
+        "smell-catalog.yml",
         "workflow-state-schema.yml",
     ):
         src = base_preset / filename

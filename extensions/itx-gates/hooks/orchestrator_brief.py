@@ -35,6 +35,7 @@ from orchestrator_common import (
     _traceability_mode_id_fields,
     load_knowledge_manifest,
 )
+from smell_mapping import guidance_from_gate_feedback
 
 
 def _now_iso_utc() -> str:
@@ -255,6 +256,7 @@ def _format_execution_brief(
     out_scope: List[str],
     file_refs: List[str],
     selected_patterns: List[str],
+    smell_guidance: List[str],
     targeted_overlays: List[str],
     active_context: List[str],
     constraints: List[str],
@@ -305,6 +307,9 @@ def _format_execution_brief(
     if selected_patterns:
         lines.extend(["", "## Selected Patterns To Load"])
         lines.extend([f"- {item}" for item in selected_patterns[:8]])
+    if smell_guidance:
+        lines.extend(["", "## Smell Guidance"])
+        lines.extend([f"- {item}" for item in smell_guidance[:8]])
     if targeted_overlays:
         lines.extend(["", "## Targeted Micro-Overlays"])
         lines.extend([f"- {item}" for item in targeted_overlays[:8]])
@@ -914,10 +919,15 @@ def _generate_execution_brief(workspace: Path, config: Dict[str, Any], policy: D
 
     gate_feedback_path = workspace / ".specify" / "context" / "gate_feedback.md"
     gate_summaries: List[str] = []
+    smell_guidance: List[str] = []
     has_tier2 = False
     if gate_feedback_path.exists():
         gate_feedback_text = gate_feedback_path.read_text(encoding="utf-8", errors="ignore")
         gate_summaries, has_tier2 = _parse_gate_feedback_summaries(gate_feedback_text, limit=5)
+        try:
+            smell_guidance = guidance_from_gate_feedback(workspace, gate_feedback_text)
+        except Exception as exc:  # noqa: BLE001
+            sys.stderr.write(f"[itx-gates] Warning: smell guidance mapping failed: {exc}\n")
     risk_lines.extend(gate_summaries)
 
     approval_holds: List[str] = []
@@ -976,6 +986,7 @@ def _generate_execution_brief(workspace: Path, config: Dict[str, Any], policy: D
         out_scope=out_scope,
         file_refs=dedup_files,
         selected_patterns=selected_patterns,
+        smell_guidance=smell_guidance,
         targeted_overlays=targeted_overlays,
         active_context=active_context,
         constraints=dedup_constraints,

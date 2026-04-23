@@ -1,0 +1,138 @@
+version: 1
+smells:
+  - id: LONG_METHOD
+    fowler_name: "Long Method"
+    aliases: ["Long Function"]
+    refactorings:
+      - id: EXTRACT_FUNCTION
+        intent: "Lift a coherent fragment into its own named function."
+        url: https://refactoring.com/catalog/extractFunction.html
+        priority: 1
+      - id: REPLACE_TEMP_WITH_QUERY
+        intent: "Turn a local temp into a reusable query method."
+        url: https://refactoring.com/catalog/replaceTempWithQuery.html
+        priority: 2
+    detectors:
+      sonar: ["java:S138", "java:S3776"]
+      eslint: ["max-lines-per-function", "complexity"]
+      pylint: ["R0915", "R1260"]
+      pmd: ["ExcessiveMethodLength", "CyclomaticComplexity"]
+      checkstyle: ["MethodLength"]
+      radon: ["cc --min C"]
+    test_first:
+      strategy: characterization
+      hint: "Pin whole-function behavior with a golden-output test before extracting."
+    advisory: >
+      Prefer Extract Function. Preserve the outer signature. Name extractions
+      after intent. Stop at 3 extractions or cyclomatic <= 5.
+    language_overlays:
+      java_8:
+        prefer: [stream-collect]
+        note: "Prefer Stream.collect over Stream.toList (Java 16+)."
+      dotnet_fx_2:
+        avoid: [LINQ, async_await]
+        note: "No LINQ/async on .NET FX 2.0; explicit iteration + delegates."
+
+  - id: FEATURE_ENVY
+    fowler_name: "Feature Envy"
+    aliases: ["Law of Demeter violation"]
+    refactorings:
+      - id: MOVE_FUNCTION
+        intent: "Move behavior to the object that owns the data it uses most."
+        url: https://refactoring.com/catalog/moveFunction.html
+        priority: 1
+      - id: HIDE_DELEGATE
+        intent: "Shorten traversal chains with explicit delegation methods."
+        url: https://refactoring.com/catalog/hideDelegate.html
+        priority: 2
+    detectors:
+      sonar: ["java:S6539"]
+      eslint: ["max-depth"]
+      pylint: ["R0903"]
+      pmd: ["LawOfDemeter"]
+      checkstyle: []
+      radon: []
+    test_first:
+      strategy: characterization
+      hint: "Capture observed collaborator interactions before moving behavior."
+    advisory: >
+      Move behavior close to data ownership. Keep call chains shallow and
+      avoid exposing deep object graphs to callers.
+
+  - id: LARGE_CLASS
+    fowler_name: "Large Class"
+    aliases: ["God Class"]
+    refactorings:
+      - id: EXTRACT_CLASS
+        intent: "Split unrelated responsibilities into a focused new type."
+        url: https://refactoring.com/catalog/extractClass.html
+        priority: 1
+      - id: EXTRACT_SUBCLASS
+        intent: "Isolate optional behavior into subclassed role types."
+        url: https://refactoring.com/catalog/extractSubclass.html
+        priority: 2
+    detectors:
+      sonar: ["java:S6539", "java:S1450"]
+      eslint: ["max-classes-per-file"]
+      pylint: ["R0902"]
+      pmd: ["GodClass", "TooManyFields"]
+      checkstyle: ["ClassDataAbstractionCoupling"]
+      radon: ["raw"]
+    test_first:
+      strategy: characterization
+      hint: "Lock behavior and side effects before slicing responsibilities."
+    advisory: >
+      Extract by cohesive responsibility. Keep public contracts stable while
+      shrinking field/method breadth in each pass.
+
+  - id: SHOTGUN_SURGERY
+    fowler_name: "Shotgun Surgery"
+    aliases: ["Divergent Change"]
+    refactorings:
+      - id: COMBINE_FUNCTIONS_INTO_CLASS
+        intent: "Group related edits behind a cohesive abstraction boundary."
+        url: https://refactoring.com/catalog/combineFunctionsIntoClass.html
+        priority: 1
+      - id: MOVE_FUNCTION
+        intent: "Relocate change hotspots toward a single responsible module."
+        url: https://refactoring.com/catalog/moveFunction.html
+        priority: 2
+    detectors:
+      sonar: ["java:S6541"]
+      eslint: ["max-lines"]
+      pylint: ["R0914"]
+      pmd: ["ExcessiveClassLength"]
+      checkstyle: []
+      radon: []
+    test_first:
+      strategy: characterization
+      hint: "Write regression tests over the cross-file behavior before consolidation."
+    advisory: >
+      Consolidate cross-cutting behavior into one seam to reduce scattered edits.
+      Prefer one abstraction change over many call-site tweaks.
+
+  - id: DATA_CLUMPS
+    fowler_name: "Data Clumps"
+    aliases: ["Too Many Parameters"]
+    refactorings:
+      - id: INTRODUCE_PARAMETER_OBJECT
+        intent: "Bundle repeated argument groups into a named value object."
+        url: https://refactoring.com/catalog/introduceParameterObject.html
+        priority: 1
+      - id: PRESERVE_WHOLE_OBJECT
+        intent: "Pass owning object when consumers repeatedly need the same fields."
+        url: https://refactoring.com/catalog/preserveWholeObject.html
+        priority: 2
+    detectors:
+      sonar: ["java:S107"]
+      eslint: ["max-params"]
+      pylint: ["R0913"]
+      pmd: ["ExcessiveParameterList"]
+      checkstyle: ["ParameterNumber"]
+      radon: []
+    test_first:
+      strategy: characterization
+      hint: "Capture argument semantics before introducing a new parameter object."
+    advisory: >
+      Introduce a semantic parameter object when argument bundles recur.
+      Avoid telescoping signatures and keep callsites expressive.

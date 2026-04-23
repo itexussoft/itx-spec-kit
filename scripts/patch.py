@@ -130,6 +130,7 @@ _GOVERNANCE_FILES = (
     "decision-authority.yml",
     "input-contracts.yml",
     "notification-events.yml",
+    "smell-catalog.yml",
     "workflow-state-schema.yml",
 )
 _KB_DOC_NAMES = ("workflow-and-gates.md", "index.md", "domain-selection.md", "delivery-mechanics.md", "migration-guide.md")
@@ -491,6 +492,7 @@ def patch_workspace(kit_root: Path, workspace: Path, force: bool = False) -> Tup
         "decision-authority.yml",
         "input-contracts.yml",
         "notification-events.yml",
+        "smell-catalog.yml",
         "workflow-state-schema.yml",
     ):
         editable_files.append((base_preset / name, specify_dir / name))

@@ -71,6 +71,33 @@ class ValidateCatalogTests(unittest.TestCase):
             'schema_version: "1.0"\nextension:\n  id: "itx-brownfield-workflows"\n  version: "0.1.0"\n',
             encoding="utf-8",
         )
+        (tmp / "presets" / "base" / "smell-catalog.yml").write_text(
+            yaml.safe_dump(
+                {
+                    "version": 1,
+                    "smells": [
+                        {
+                            "id": "LONG_METHOD",
+                            "fowler_name": "Long Method",
+                            "aliases": ["Long Function"],
+                            "refactorings": [
+                                {
+                                    "id": "EXTRACT_FUNCTION",
+                                    "intent": "Extract cohesive behavior.",
+                                    "url": "https://refactoring.com/catalog/extractFunction.html",
+                                    "priority": 1,
+                                }
+                            ],
+                            "detectors": {"sonar": ["java:S138"]},
+                            "test_first": {"strategy": "characterization", "hint": "Freeze behavior before extraction."},
+                            "advisory": "Prefer Extract Function in small passes.",
+                        }
+                    ],
+                },
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
 
     def run_main_with_workspace(self, ws: Path) -> int:
         module = load_validate_module()
@@ -126,6 +153,16 @@ class ValidateCatalogTests(unittest.TestCase):
             self.make_workspace(ws)
             (ws / "extensions" / "itx-gates" / "extension.yml").write_text(
                 'schema_version: "1.0"\nextension:\n  id: "itx-gates"\n  version: "0.2.0"\n',
+                encoding="utf-8",
+            )
+            self.assertEqual(self.run_main_with_workspace(ws), 1)
+
+    def test_validate_catalog_fails_on_invalid_smell_catalog(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp)
+            self.make_workspace(ws)
+            (ws / "presets" / "base" / "smell-catalog.yml").write_text(
+                yaml.safe_dump({"version": 1, "smells": [{"id": "BROKEN"}]}, sort_keys=False),
                 encoding="utf-8",
             )
             self.assertEqual(self.run_main_with_workspace(ws), 1)

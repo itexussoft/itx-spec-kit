@@ -254,6 +254,7 @@ class ItxInitTests(unittest.TestCase):
                 "decision-authority.yml",
                 "input-contracts.yml",
                 "notification-events.yml",
+                "smell-catalog.yml",
                 "workflow-state-schema.yml",
             ):
                 (kit / "presets" / "base" / filename).write_text("k: v\n", encoding="utf-8")
@@ -261,6 +262,7 @@ class ItxInitTests(unittest.TestCase):
 
             itx_init.stage_docs_and_policy(kit, ws, domain="base")
             self.assertTrue((ws / "docs" / "knowledge-base" / "migration-guide.md").exists())
+            self.assertTrue((ws / ".specify" / "smell-catalog.yml").exists())
 
     def test_base_docs_index_references_migration_guide(self):
         text = (ROOT / "presets" / "base" / "docs" / "index.md").read_text(encoding="utf-8")
