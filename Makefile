@@ -37,6 +37,14 @@ compile:
 		extensions/itx-gates/hooks/architecture_parsers/sarif.py \
 		extensions/itx-gates/hooks/architecture_parsers/junit_xml.py \
 		extensions/itx-gates/hooks/architecture_parsers/jsonpath.py \
+		extensions/itx-gates/hooks/mutation_runner.py \
+		extensions/itx-gates/hooks/mutation_remediation.py \
+		extensions/itx-gates/hooks/mutation_adapters/__init__.py \
+		extensions/itx-gates/hooks/mutation_adapters/generic_command_adapter.py \
+		extensions/itx-gates/hooks/mutation_adapters/stryker_adapter.py \
+		extensions/itx-gates/hooks/mutation_adapters/pitest_adapter.py \
+		extensions/itx-gates/hooks/mutation_adapters/cargo_mutants_adapter.py \
+		extensions/itx-gates/hooks/mutation_adapters/python_adapter.py \
 		extensions/itx-gates/hooks/validators/__init__.py \
 		extensions/itx-gates/hooks/validators/trading_ast.py \
 		extensions/itx-gates/hooks/validators/banking_heuristic.py \
@@ -58,6 +66,7 @@ compile:
 		tests/test_itx_init.py \
 		tests/test_patch.py \
 		tests/test_architecture_wave_f.py \
+		tests/test_mutation_wave_g.py \
 		tests/test_saas_validator.py \
 		tests/test_sast_and_context_router.py \
 		tests/test_itx_gates_runtime_state.py

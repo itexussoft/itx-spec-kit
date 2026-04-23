@@ -217,6 +217,36 @@ quality:
     modulith:
       command: null
       report_file: null
+  mutation_testing:
+    enabled: false
+    mode: advisory
+    threshold: 60
+    strict_threshold: 80
+    runner: auto
+    command: null
+    incremental: true
+    flaky_reruns: 2
+    ignore_file: .specify/mutation-ignore.yml
+    scope: core_modules
+    baseline_file: .specify/context/mutation-baseline.json
+    events: [after_implement]
+    exit_code_signals: report
+    timeout_s: 120
+    stryker:
+      command: null
+      report_file: reports/mutation/mutation.json
+    pitest:
+      command: null
+      report_glob: target/pit-reports/*/mutations.xml
+    cargo-mutants:
+      command: null
+      report_file: mutants.out/outcomes.json
+    python:
+      command: null
+      report_file: null
+      format: auto
+    generic:
+      report_file: null
   security:
     enabled: false
     provider: noop
@@ -341,6 +371,38 @@ rules:
   architecture-unmapped-rule:
     severity: tier2
     confidence: deterministic
+    remediation_owner: feature-team
+  mutation-config-missing:
+    severity: tier1
+    confidence: heuristic
+    remediation_owner: feature-team
+  mutation-runner-error:
+    severity: tier1
+    confidence: heuristic
+    remediation_owner: feature-team
+  mutation-runner-crashed:
+    severity: tier1
+    confidence: heuristic
+    remediation_owner: feature-team
+  mutation-report-parse-failed:
+    severity: tier1
+    confidence: heuristic
+    remediation_owner: feature-team
+  mutation-command-failed:
+    severity: tier1
+    confidence: heuristic
+    remediation_owner: feature-team
+  mutation-score-below-threshold:
+    severity: tier1
+    confidence: heuristic
+    remediation_owner: feature-team
+  mutation-survived:
+    severity: tier1
+    confidence: heuristic
+    remediation_owner: feature-team
+  mutation-no-coverage:
+    severity: tier1
+    confidence: heuristic
     remediation_owner: feature-team
   healthcare-phi-logging:
     severity: tier1

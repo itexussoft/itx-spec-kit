@@ -233,6 +233,19 @@ def _fingerprint_from_result(rule_id: str, file_path: str, line: str, message: s
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
+def _fingerprint_from_mutant(mutant_id: str, mutator: str, file_path: str, line: str, replacement: str) -> str:
+    raw = "::".join(
+        [
+            mutant_id.strip().lower(),
+            mutator.strip().lower(),
+            file_path.strip().lower(),
+            line.strip(),
+            replacement.strip().lower(),
+        ]
+    )
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
 def _resolve_baseline_file(workspace: Path, kind: str) -> Path:
     policy = load_policy(workspace)
     quality = policy.get("quality") if isinstance(policy.get("quality"), dict) else {}
@@ -288,6 +301,29 @@ def _collect_architecture_fingerprints(report_payload: dict) -> list[str]:
     return sorted(set(fingerprints))
 
 
+def _collect_mutation_fingerprints(report_payload: dict) -> list[str]:
+    mutants = report_payload.get("mutants")
+    if not isinstance(mutants, list):
+        return []
+    fingerprints: list[str] = []
+    for item in mutants:
+        if not isinstance(item, dict):
+            continue
+        fp = item.get("fingerprint")
+        if isinstance(fp, str) and fp.strip():
+            fingerprints.append(fp.strip())
+            continue
+        mutant_id = str(item.get("id", "")).strip()
+        mutator = str(item.get("mutatorName", "")).strip()
+        location = item.get("location") if isinstance(item.get("location"), dict) else {}
+        file_path = str(location.get("file", "")).strip()
+        line = str(location.get("line", "")).strip()
+        replacement_raw = item.get("replacement")
+        replacement = str(replacement_raw).strip() if isinstance(replacement_raw, str) else ""
+        fingerprints.append(_fingerprint_from_mutant(mutant_id, mutator, file_path, line, replacement))
+    return sorted(set(fingerprints))
+
+
 def update_baseline(*, kind: str, workspace: Path, json_mode: bool) -> int:
     context = workspace / ".specify" / "context"
     report_name = "architecture-report.json" if kind == "architecture" else "mutation-report.json"
@@ -313,12 +349,7 @@ def update_baseline(*, kind: str, workspace: Path, json_mode: bool) -> int:
     if kind == "architecture":
         fingerprints = _collect_architecture_fingerprints(report_payload if isinstance(report_payload, dict) else {})
     else:
-        payload = {"kind": kind, "status": "unsupported", "message": "Mutation baseline update will be enabled with Wave G report format."}
-        if json_mode:
-            sys.stdout.write(json.dumps(payload, indent=2) + "\n")
-        else:
-            sys.stderr.write("[itx-gates] Mutation baseline update is not available yet.\n")
-        return 1
+        fingerprints = _collect_mutation_fingerprints(report_payload if isinstance(report_payload, dict) else {})
 
     baseline_path = _resolve_baseline_file(workspace, kind)
     baseline_path.parent.mkdir(parents=True, exist_ok=True)

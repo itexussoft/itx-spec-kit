@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Mapping, Sequence, cast
 
 from architecture_runner import run as run_architecture_checks
+from mutation_runner import run as run_mutation_checks
 from orchestrator_brief import _generate_execution_brief, _sync_lazy_knowledge
 from orchestrator_common import (
     DOMAIN_VALIDATORS,
@@ -252,6 +253,18 @@ def main() -> int:
                 "severity": TIER_1,
                 "rule": "architecture-runner-crashed",
                 "message": f"Architecture runner crashed: {exc}",
+                "confidence": "heuristic",
+                "remediation_owner": "feature-team",
+            }
+        )
+    try:
+        findings.extend(run_mutation_checks(event=event, workspace=workspace, policy=policy))
+    except Exception as exc:  # noqa: BLE001
+        findings.append(
+            {
+                "severity": TIER_1,
+                "rule": "mutation-runner-crashed",
+                "message": f"Mutation runner crashed: {exc}",
                 "confidence": "heuristic",
                 "remediation_owner": "feature-team",
             }
